@@ -1,3 +1,267 @@
+<?php
+// Démarrage de la session pour les messages
+session_start();
+
+// Connexion à la base de données
+$host = '127.0.0.1:3306';
+$dbname = 'imprimerie';
+$username = 'root';
+$password = 'admine';
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+} catch(PDOException $e) {
+    die("Erreur de connexion à la base de données: " . $e->getMessage());
+}
+
+// Variables pour les messages
+$message = '';
+$messageType = '';
+
+// Gérer les actions CRUD
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        $action = $_POST['action'];
+        
+        if ($action === 'add' || $action === 'edit') {
+            // Valider et nettoyer les données
+            $firstName = trim($_POST['firstName']);
+            $lastName = trim($_POST['lastName']);
+            $email = trim($_POST['email']);
+            $position = trim($_POST['position']);
+            $department = $_POST['department'];
+            $salary = floatval($_POST['salary']);
+            $hireDate = $_POST['hireDate'];
+            $phone = trim($_POST['phone']);
+            
+            // Valider les données requises
+            if (empty($firstName) || empty($lastName) || empty($email) || empty($position) || empty($department)) {
+                $message = "Veuillez remplir tous les champs obligatoires!";
+                $messageType = "error";
+                $_SESSION['message'] = $message;
+                $_SESSION['message_type'] = $messageType;
+            } else {
+                // Pour la base de données
+                $username = strtolower(str_replace(' ', '.', $firstName . '.' . $lastName));
+                $fullName = $firstName . ' ' . $lastName;
+                $role = 'employee';
+                
+                // Pour le mot de passe par défaut
+                $defaultPassword = password_hash('password123', PASSWORD_DEFAULT);
+                
+                if ($action === 'add') {
+                    // Vérifier si l'email existe déjà
+                    $checkEmailSql = "SELECT id FROM admin_users WHERE email = :email";
+                    $checkStmt = $pdo->prepare($checkEmailSql);
+                    $checkStmt->execute([':email' => $email]);
+                    
+                    if ($checkStmt->rowCount() > 0) {
+                        $_SESSION['message'] = "Cet email est déjà utilisé par un autre utilisateur!";
+                        $_SESSION['message_type'] = "error";
+                    } else {
+                        // Ajouter un nouvel employé
+                        try {
+                            $pdo->beginTransaction();
+                            
+                            // Insérer dans admin_users
+                            $sql = "INSERT INTO admin_users (username, password, full_name, email, role, created_at) 
+                                    VALUES (:username, :password, :full_name, :email, :role, NOW())";
+                            $stmt = $pdo->prepare($sql);
+                            $stmt->execute([
+                                ':username' => $username,
+                                ':password' => $defaultPassword,
+                                ':full_name' => $fullName,
+                                ':email' => $email,
+                                ':role' => $role
+                            ]);
+                            
+                            $employeeId = $pdo->lastInsertId();
+                            
+                            // Insérer dans employees
+                            $sqlEmployee = "INSERT INTO employees (user_id, position, department, salary, hire_date, phone) 
+                                            VALUES (:user_id, :position, :department, :salary, :hire_date, :phone)";
+                            $stmtEmployee = $pdo->prepare($sqlEmployee);
+                            $stmtEmployee->execute([
+                                ':user_id' => $employeeId,
+                                ':position' => $position,
+                                ':department' => $department,
+                                ':salary' => $salary,
+                                ':hire_date' => $hireDate,
+                                ':phone' => $phone
+                            ]);
+                            
+                            $pdo->commit();
+                            $_SESSION['message'] = "Employé ajouté avec succès!";
+                            $_SESSION['message_type'] = "success";
+                            
+                            header("Location: employees.php");
+                            exit();
+                        } catch(PDOException $e) {
+                            $pdo->rollBack();
+                            $_SESSION['message'] = "Erreur lors de l'ajout de l'employé: " . $e->getMessage();
+                            $_SESSION['message_type'] = "error";
+                            header("Location: employees.php");
+                            exit();
+                        }
+                    }
+                } elseif ($action === 'edit' && isset($_POST['employee_id'])) {
+                    // Modifier un employé existant
+                    $employeeId = intval($_POST['employee_id']);
+                    
+                    try {
+                        $pdo->beginTransaction();
+                        
+                        // Mettre à jour admin_users
+                        $sql = "UPDATE admin_users 
+                                SET full_name = :full_name, email = :email 
+                                WHERE id = :id AND role = 'employee'";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute([
+                            ':full_name' => $fullName,
+                            ':email' => $email,
+                            ':id' => $employeeId
+                        ]);
+                        
+                        // Vérifier si l'entrée existe déjà dans employees
+                        $checkSql = "SELECT id FROM employees WHERE user_id = :user_id";
+                        $checkStmt = $pdo->prepare($checkSql);
+                        $checkStmt->execute([':user_id' => $employeeId]);
+                        
+                        if ($checkStmt->rowCount() > 0) {
+                            // Mettre à jour
+                            $updateSql = "UPDATE employees 
+                                         SET position = :position, department = :department, 
+                                             salary = :salary, hire_date = :hire_date, phone = :phone 
+                                         WHERE user_id = :user_id";
+                            $updateStmt = $pdo->prepare($updateSql);
+                            $updateStmt->execute([
+                                ':position' => $position,
+                                ':department' => $department,
+                                ':salary' => $salary,
+                                ':hire_date' => $hireDate,
+                                ':phone' => $phone,
+                                ':user_id' => $employeeId
+                            ]);
+                        } else {
+                            // Insérer
+                            $insertSql = "INSERT INTO employees (user_id, position, department, salary, hire_date, phone) 
+                                         VALUES (:user_id, :position, :department, :salary, :hire_date, :phone)";
+                            $insertStmt = $pdo->prepare($insertSql);
+                            $insertStmt->execute([
+                                ':user_id' => $employeeId,
+                                ':position' => $position,
+                                ':department' => $department,
+                                ':salary' => $salary,
+                                ':hire_date' => $hireDate,
+                                ':phone' => $phone
+                            ]);
+                        }
+                        
+                        $pdo->commit();
+                        $_SESSION['message'] = "Employé modifié avec succès!";
+                        $_SESSION['message_type'] = "success";
+                        
+                        header("Location: employees.php");
+                        exit();
+                    } catch(PDOException $e) {
+                        $pdo->rollBack();
+                        $_SESSION['message'] = "Erreur lors de la modification de l'employé: " . $e->getMessage();
+                        $_SESSION['message_type'] = "error";
+                        header("Location: employees.php");
+                        exit();
+                    }
+                }
+            }
+        } elseif ($action === 'delete' && isset($_POST['employee_id'])) {
+            // Supprimer un employé
+            $employeeId = intval($_POST['employee_id']);
+            
+            try {
+                $sql = "DELETE FROM admin_users WHERE id = :id AND role = 'employee'";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([':id' => $employeeId]);
+                
+                if ($stmt->rowCount() > 0) {
+                    $_SESSION['message'] = "Employé supprimé avec succès!";
+                    $_SESSION['message_type'] = "success";
+                } else {
+                    $_SESSION['message'] = "Employé non trouvé ou ne peut pas être supprimé!";
+                    $_SESSION['message_type'] = "error";
+                }
+                
+                header("Location: employees.php");
+                exit();
+            } catch(PDOException $e) {
+                $_SESSION['message'] = "Erreur lors de la suppression de l'employé: " . $e->getMessage();
+                $_SESSION['message_type'] = "error";
+                header("Location: employees.php");
+                exit();
+            }
+        }
+    }
+}
+
+// Récupérer les messages de session
+if (isset($_SESSION['message'])) {
+    $message = $_SESSION['message'];
+    $messageType = $_SESSION['message_type'];
+    unset($_SESSION['message']);
+    unset($_SESSION['message_type']);
+}
+
+// Récupérer les employés
+try {
+    $sql = "SELECT au.id, au.full_name, au.email, au.username, au.role, au.created_at,
+                   e.position, e.department, e.salary, e.hire_date, e.phone
+            FROM admin_users au
+            LEFT JOIN employees e ON au.id = e.user_id
+            WHERE au.role = 'employee'
+            ORDER BY COALESCE(e.hire_date, au.created_at) DESC";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute();
+    $employees = $stmt->fetchAll();
+} catch(PDOException $e) {
+    $employees = [];
+    $message = "Erreur lors de la récupération des employés: " . $e->getMessage();
+    $messageType = "error";
+}
+
+// Initialiser les variables pour le formulaire
+$isEditing = false;
+$currentEmployee = null;
+
+// Si on veut éditer un employé
+if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
+    $employeeId = intval($_GET['edit']);
+    
+    try {
+        $sql = "SELECT au.id, au.full_name, au.email, au.username, au.role,
+                       e.position, e.department, e.salary, e.hire_date, e.phone
+                FROM admin_users au
+                LEFT JOIN employees e ON au.id = e.user_id
+                WHERE au.id = :id AND au.role = 'employee'";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':id' => $employeeId]);
+        $currentEmployee = $stmt->fetch();
+        
+        if ($currentEmployee) {
+            $isEditing = true;
+            
+            // Séparer le nom complet en prénom et nom
+            $nameParts = explode(' ', $currentEmployee['full_name'], 2);
+            $currentEmployee['first_name'] = $nameParts[0] ?? '';
+            $currentEmployee['last_name'] = $nameParts[1] ?? '';
+        }
+    } catch(PDOException $e) {
+        $message = "Erreur lors de la récupération de l'employé: " . $e->getMessage();
+        $messageType = "error";
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -41,6 +305,8 @@
             transition: all 0.3s;
             box-shadow: var(--shadow);
             z-index: 1000;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header {
@@ -51,9 +317,8 @@
             gap: 15px;
         }
 
-        .sidebar-header img {
-            width: 40px;
-            height: 40px;
+        .sidebar-header i {
+            font-size: 2rem;
         }
 
         .sidebar-header h2 {
@@ -63,6 +328,7 @@
 
         .sidebar-menu {
             padding: 15px 0;
+            flex: 1;
         }
 
         .sidebar-menu ul {
@@ -70,18 +336,24 @@
         }
 
         .sidebar-menu li {
-            padding: 12px 20px;
             transition: all 0.3s;
-            display: flex;
-            align-items: center;
         }
 
-        .sidebar-menu li:hover {
+        .sidebar-menu li a {
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .sidebar-menu li a:hover {
             background: rgba(255, 255, 255, 0.1);
             cursor: pointer;
         }
 
-        .sidebar-menu li.active {
+        .sidebar-menu li.active a {
             background: var(--secondary);
             border-left: 4px solid var(--accent);
         }
@@ -92,11 +364,41 @@
             text-align: center;
         }
 
+        .sidebar-footer {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-details h4 {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        .user-details span {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
         /* Main Content Styles */
         .main-content {
             flex: 1;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
         /* Header Styles */
@@ -501,14 +803,27 @@
                 display: none;
             }
             
-            .sidebar-menu li {
-                text-align: center;
+            .sidebar-header i {
+                font-size: 1.5rem;
+                margin: 0 auto;
+            }
+            
+            .sidebar-menu li a {
                 padding: 15px 10px;
+                justify-content: center;
             }
             
             .sidebar-menu i {
                 margin-right: 0;
                 font-size: 1.2rem;
+            }
+            
+            .sidebar-footer .user-details {
+                display: none;
+            }
+            
+            .user-info {
+                justify-content: center;
             }
             
             .table-container {
@@ -552,272 +867,72 @@
                 width: 100%;
                 justify-content: center;
             }
+            
+            .header {
+                padding: 15px;
+            }
+            
+            .content {
+                padding: 15px;
+            }
         }
     </style>
 </head>
 <body>
-<?php
-// Connexion à la base de données
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root'; // À modifier selon votre configuration
-$password = 'admine'; // À modifier selon votre configuration
-
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-} catch(PDOException $e) {
-    die("Erreur de connexion à la base de données: " . $e->getMessage());
-}
-
-// Variables pour les messages
-$message = '';
-$messageType = '';
-
-// Gérer les actions CRUD
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        $action = $_POST['action'];
-        
-        if ($action === 'add' || $action === 'edit') {
-            // Ajouter ou modifier un employé
-            $firstName = $_POST['firstName'];
-            $lastName = $_POST['lastName'];
-            $email = $_POST['email'];
-            $position = $_POST['position'];
-            $department = $_POST['department'];
-            $salary = $_POST['salary'];
-            $hireDate = $_POST['hireDate'];
-            $phone = $_POST['phone'];
-            
-            // Pour la base de données, nous utiliserons admin_users table
-            // Nous allons adapter les champs pour correspondre à la table admin_users
-            $username = strtolower($firstName . '.' . $lastName);
-            $fullName = $firstName . ' ' . $lastName;
-            $role = 'employee'; // Par défaut, tous les employés créés ici auront le rôle 'employee'
-            
-            // Pour le mot de passe, nous allons générer un mot de passe par défaut (hashé)
-            $defaultPassword = password_hash('password123', PASSWORD_DEFAULT);
-            
-            if ($action === 'add') {
-                // Ajouter un nouvel employé
-                try {
-                    $sql = "INSERT INTO admin_users (username, password, full_name, email, role, created_at) 
-                            VALUES (:username, :password, :full_name, :email, :role, NOW())";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        ':username' => $username,
-                        ':password' => $defaultPassword,
-                        ':full_name' => $fullName,
-                        ':email' => $email,
-                        ':role' => $role
-                    ]);
-                    
-                    // Maintenant, insérer les informations supplémentaires dans une nouvelle table
-                    // Nous allons créer une table 'employees' si elle n'existe pas
-                    $employeeId = $pdo->lastInsertId();
-                    
-                    // Créer la table employees si elle n'existe pas
-                    $createTableSql = "CREATE TABLE IF NOT EXISTS employees (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        user_id INT NOT NULL,
-                        position VARCHAR(200),
-                        department VARCHAR(100),
-                        salary DECIMAL(10,2),
-                        hire_date DATE,
-                        phone VARCHAR(50),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES admin_users(id) ON DELETE CASCADE
-                    )";
-                    $pdo->exec($createTableSql);
-                    
-                    // Insérer les détails de l'employé
-                    $sqlEmployee = "INSERT INTO employees (user_id, position, department, salary, hire_date, phone) 
-                                    VALUES (:user_id, :position, :department, :salary, :hire_date, :phone)";
-                    $stmtEmployee = $pdo->prepare($sqlEmployee);
-                    $stmtEmployee->execute([
-                        ':user_id' => $employeeId,
-                        ':position' => $position,
-                        ':department' => $department,
-                        ':salary' => $salary,
-                        ':hire_date' => $hireDate,
-                        ':phone' => $phone
-                    ]);
-                    
-                    $message = "Employé ajouté avec succès!";
-                    $messageType = "success";
-                } catch(PDOException $e) {
-                    $message = "Erreur lors de l'ajout de l'employé: " . $e->getMessage();
-                    $messageType = "error";
-                }
-            } elseif ($action === 'edit' && isset($_POST['employee_id'])) {
-                // Modifier un employé existant
-                $employeeId = $_POST['employee_id'];
-                
-                try {
-                    // Mettre à jour l'utilisateur dans admin_users
-                    $sql = "UPDATE admin_users 
-                            SET full_name = :full_name, email = :email 
-                            WHERE id = :id";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([
-                        ':full_name' => $fullName,
-                        ':email' => $email,
-                        ':id' => $employeeId
-                    ]);
-                    
-                    // Mettre à jour les détails dans employees
-                    // Vérifier si l'entrée existe déjà
-                    $checkSql = "SELECT id FROM employees WHERE user_id = :user_id";
-                    $checkStmt = $pdo->prepare($checkSql);
-                    $checkStmt->execute([':user_id' => $employeeId]);
-                    
-                    if ($checkStmt->rowCount() > 0) {
-                        // Mettre à jour
-                        $updateSql = "UPDATE employees 
-                                     SET position = :position, department = :department, 
-                                         salary = :salary, hire_date = :hire_date, phone = :phone 
-                                     WHERE user_id = :user_id";
-                        $updateStmt = $pdo->prepare($updateSql);
-                        $updateStmt->execute([
-                            ':position' => $position,
-                            ':department' => $department,
-                            ':salary' => $salary,
-                            ':hire_date' => $hireDate,
-                            ':phone' => $phone,
-                            ':user_id' => $employeeId
-                        ]);
-                    } else {
-                        // Insérer
-                        $insertSql = "INSERT INTO employees (user_id, position, department, salary, hire_date, phone) 
-                                     VALUES (:user_id, :position, :department, :salary, :hire_date, :phone)";
-                        $insertStmt = $pdo->prepare($insertSql);
-                        $insertStmt->execute([
-                            ':user_id' => $employeeId,
-                            ':position' => $position,
-                            ':department' => $department,
-                            ':salary' => $salary,
-                            ':hire_date' => $hireDate,
-                            ':phone' => $phone
-                        ]);
-                    }
-                    
-                    $message = "Employé modifié avec succès!";
-                    $messageType = "success";
-                } catch(PDOException $e) {
-                    $message = "Erreur lors de la modification de l'employé: " . $e->getMessage();
-                    $messageType = "error";
-                }
-            }
-        } elseif ($action === 'delete' && isset($_POST['employee_id'])) {
-            // Supprimer un employé
-            $employeeId = $_POST['employee_id'];
-            
-            try {
-                // La suppression dans admin_users déclenchera CASCADE dans employees
-                $sql = "DELETE FROM admin_users WHERE id = :id AND role = 'employee'";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([':id' => $employeeId]);
-                
-                if ($stmt->rowCount() > 0) {
-                    $message = "Employé supprimé avec succès!";
-                    $messageType = "success";
-                } else {
-                    $message = "Employé non trouvé ou ne peut pas être supprimé!";
-                    $messageType = "error";
-                }
-            } catch(PDOException $e) {
-                $message = "Erreur lors de la suppression de l'employé: " . $e->getMessage();
-                $messageType = "error";
-            }
-        }
-    }
-}
-
-// Récupérer les employés (avec jointure entre admin_users et employees)
-try {
-    // Vérifier si la table employees existe
-    $tableExists = $pdo->query("SHOW TABLES LIKE 'employees'")->rowCount() > 0;
-    
-    if ($tableExists) {
-        $sql = "SELECT au.id, au.full_name, au.email, au.username, au.role, au.created_at,
-                       e.position, e.department, e.salary, e.hire_date, e.phone
-                FROM admin_users au
-                LEFT JOIN employees e ON au.id = e.user_id
-                WHERE au.role = 'employee'
-                ORDER BY e.hire_date DESC";
-    } else {
-        // Si la table employees n'existe pas encore, récupérer seulement les utilisateurs avec rôle employee
-        $sql = "SELECT id, full_name, email, username, role, created_at
-                FROM admin_users
-                WHERE role = 'employee'
-                ORDER BY created_at DESC";
-    }
-    
-    $stmt = $pdo->query($sql);
-    $employees = $stmt->fetchAll();
-} catch(PDOException $e) {
-    $employees = [];
-    $message = "Erreur lors de la récupération des employés: " . $e->getMessage();
-    $messageType = "error";
-}
-
-// Initialiser les variables pour le formulaire
-$isEditing = false;
-$currentEmployee = null;
-
-// Si on veut éditer un employé
-if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
-    $employeeId = $_GET['edit'];
-    
-    try {
-        if ($tableExists) {
-            $sql = "SELECT au.id, au.full_name, au.email, au.username, au.role,
-                           e.position, e.department, e.salary, e.hire_date, e.phone
-                    FROM admin_users au
-                    LEFT JOIN employees e ON au.id = e.user_id
-                    WHERE au.id = :id AND au.role = 'employee'";
-        } else {
-            $sql = "SELECT id, full_name, email, username, role
-                    FROM admin_users
-                    WHERE id = :id AND role = 'employee'";
-        }
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([':id' => $employeeId]);
-        $currentEmployee = $stmt->fetch();
-        
-        if ($currentEmployee) {
-            $isEditing = true;
-            
-            // Séparer le nom complet en prénom et nom
-            $nameParts = explode(' ', $currentEmployee['full_name'], 2);
-            $currentEmployee['first_name'] = $nameParts[0] ?? '';
-            $currentEmployee['last_name'] = $nameParts[1] ?? '';
-        }
-    } catch(PDOException $e) {
-        $message = "Erreur lors de la récupération de l'employé: " . $e->getMessage();
-        $messageType = "error";
-    }
-}
-?>
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <i class="fas fa-print fa-2x"></i>
+            <i class="fas fa-print"></i>
             <h2>Imprimerie Pro</h2>
         </div>
         <div class="sidebar-menu">
             <ul>
-                <li><i class="fas fa-home"></i> <span>Tableau de Bord</span></li>
-                <li><i class="fas fa-shopping-cart"></i> <span>Commandes</span></li>
-                <li><i class="fas fa-box"></i> <span>Produits</span></li>
-                <li><i class="fas fa-users"></i> <span>Clients</span></li>
-                <li class="active"><i class="fas fa-user-tie"></i> <span>Employés</span></li>
-                <li><i class="fas fa-chart-bar"></i> <span>Rapports</span></li>
-                <li><i class="fas fa-cog"></i> <span>Paramètres</span></li>
+                <li>
+                    <a href="dashboard.php">
+                        <i class="fas fa-home"></i>
+                        <span>Tableau de Bord</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="ajustestock.php">
+                        <i class="fas fa-box"></i>
+                        <span>Stock</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="gestion.php">
+                        <i class="fas fa-users"></i>
+                        <span>Gestion</span>
+                    </a>
+                </li>
+                <li class="active">
+                    <a href="employees.php">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employés</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="facture.php">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Facturation</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="profile.php">
+                        <i class="fas fa-user"></i>
+                        <span>Mon Profil</span>
+                    </a>
+                </li>
             </ul>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <img src="" alt="Admin" class="user-avatar">
+                <div class="user-details">
+                    <h4>Administrateur</h4>
+                    <span>Super Admin</span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -946,10 +1061,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                 <div class="employees-header">
                     <h3>Liste des employés</h3>
                     <div class="employees-actions">
-                        
-                        </button>
-                        
-                        </button>
+                        <!-- You can add export or filter buttons here if needed -->
                     </div>
                 </div>
                 
@@ -1068,7 +1180,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         function showAddForm() {
             employeeForm.style.display = 'block';
             document.getElementById('formTitle').textContent = "Ajouter un nouvel employé";
-            document.getElementById('employeeFormData').action = '';
             
             // Réinitialiser le formulaire
             const form = document.getElementById('employeeFormData');
@@ -1129,16 +1240,6 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                 
                 row.style.display = found ? '' : 'none';
             }
-        }
-
-        // Exporter les employés (simulé)
-        function exportEmployees() {
-            alert('Exportation des données en CSV... (Fonctionnalité à implémenter complètement)');
-        }
-
-        // Afficher les filtres (simulé)
-        function showFilters() {
-            alert('Fenêtre de filtrage (Fonctionnalité à implémenter complètement)');
         }
 
         // Initialisation

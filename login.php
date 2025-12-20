@@ -88,11 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// If user is already logged in, redirect to dashboard
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    header('Location: dashboard.php');
-    exit();
-}
+
 ?>
 <!DOCTYPE html>
 <html lang="fr">

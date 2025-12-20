@@ -1253,7 +1253,7 @@ $stats = getStats($pdo);
                     <input type="text" placeholder="Rechercher..." id="globalSearch">
                 </div>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="" alt="Admin">
                     <span>Admin</span>
                 </div>
             </div>
@@ -1286,7 +1286,7 @@ $stats = getStats($pdo);
                         <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="revenueCount"><?php echo number_format($stats['revenue'], 2); ?> €</h3>
+                        <h3 id="revenueCount"><?php echo number_format($stats['revenue'], 2); ?> DA</h3>
                         <p>Chiffre d'Affaires</p>
                     </div>
                 </div>
@@ -1295,7 +1295,7 @@ $stats = getStats($pdo);
                         <i class="fas fa-money-bill-wave"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 id="paidCount"><?php echo number_format($stats['total_paid'], 2); ?> €</h3>
+                        <h3 id="paidCount"><?php echo number_format($stats['total_paid'], 2); ?> DA</h3>
                         <p>Total Payé</p>
                     </div>
                 </div>
@@ -1401,8 +1401,8 @@ $stats = getStats($pdo);
                                     <td><?php echo htmlspecialchars($order['description'] ?? 'N/A'); ?></td>
                                     <td><span class="status <?php echo getStatusClass($order['status']); ?>"><?php echo getStatusText($order['status']); ?></span></td>
                                     <td><?php echo $order['deadline'] ? date('d/m/Y', strtotime($order['deadline'])) : 'N/A'; ?></td>
-                                    <td><strong><?php echo number_format($order['total_amount'] ?? $order['total'], 2); ?> €</strong></td>
-                                    <td><span class="amount-paid"><?php echo number_format($order['total_paid'] ?? 0, 2); ?> €</span></td>
+                                    <td><strong><?php echo number_format($order['total_amount'] ?? $order['total'], 2); ?> DA</strong></td>
+                                    <td><span class="amount-paid"><?php echo number_format($order['total_paid'] ?? 0, 2); ?> DA</span></td>
                                     <td><span class="amount-remaining"><?php echo number_format($order['remaining'] ?? $order['total'], 2); ?> €</span></td>
                                     <td>
                                         <div class="action-buttons">
@@ -1457,7 +1457,7 @@ $stats = getStats($pdo);
                                     <td><?php echo $payment['id']; ?></td>
                                     <td><?php echo htmlspecialchars($payment['client_name']); ?></td>
                                     <td><?php echo $payment['order_id'] ? 'CMD-' . str_pad($payment['order_id'], 3, '0', STR_PAD_LEFT) : 'N/A'; ?></td>
-                                    <td><strong><?php echo number_format($payment['amount'], 2); ?> €</strong></td>
+                                    <td><strong><?php echo number_format($payment['amount'], 2); ?> DA</strong></td>
                                     <td><?php echo date('d/m/Y', strtotime($payment['payment_date'])); ?></td>
                                     <td><?php echo htmlspecialchars($payment['payment_method']); ?></td>
                                     <td><?php echo htmlspecialchars($payment['reference']); ?></td>
@@ -1619,7 +1619,7 @@ $stats = getStats($pdo);
                             <input type="number" id="orderQuantity" name="quantity" class="form-control" required min="1" value="1">
                         </div>
                         <div class="form-group">
-                            <label for="orderPrice">Prix unitaire (€) *</label>
+                            <label for="orderPrice">Prix unitaire (DA) *</label>
                             <input type="number" id="orderPrice" name="price" class="form-control" required min="0" step="0.01">
                         </div>
                     </div>
@@ -1655,7 +1655,7 @@ $stats = getStats($pdo);
                                     $remaining = $order['remaining'] ?? $total;
                                 ?>
                                 <option value="<?php echo $order['id']; ?>" data-total="<?php echo $total; ?>" data-paid="<?php echo $totalPaid; ?>">
-                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?>€, Payé: <?php echo number_format($totalPaid, 2); ?>€, Reste: <?php echo number_format($remaining, 2); ?>€)
+                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?>DA, Payé: <?php echo number_format($totalPaid, 2); ?>DA, Reste: <?php echo number_format($remaining, 2); ?>€)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -1663,9 +1663,9 @@ $stats = getStats($pdo);
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="paymentAmount">Montant (€) *</label>
+                            <label for="paymentAmount">Montant (DA) *</label>
                             <input type="number" id="paymentAmount" name="amount" class="form-control" required min="0" step="0.01">
-                            <small id="remainingAmount">Reste à payer: <span id="remainingValue">0.00</span>€</small>
+                            <small id="remainingAmount">Reste à payer: <span id="remainingValue">0.00</span>DA</small>
                         </div>
                         <div class="form-group">
                             <label for="paymentDate">Date *</label>

@@ -965,7 +965,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <li><a href="gestion.php"><i class="fas fa-users"></i> <span>Gestion</span></a></li>
                 <li><a href="employees.php"><i class="fas fa-user-tie"></i> <span>Employés</span></a></li>
                 <li ><a href="facture.php"><i class="fas fa-file-invoice-dollar"></i> <span>Facturation</span></li>
-                <li class="active"><a href="profile.php"><i class="fas fa-user"></i> <span>Mon Profil</span></a></li>
+                <li class="active"><i class="fas fa-user"></i> <span>Mon Profil</span></a></li>
                 
                 
             </ul>
@@ -986,7 +986,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="text" placeholder="Rechercher...">
                 </div>
                 <div class="user-profile" id="userProfile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin" id="profileImage">
+                    <img src="REM.jpg" alt="Admin" id="profileImage">
                     <span><?php echo htmlspecialchars($admin['first_name']); ?></span>
                     <i class="fas fa-chevron-down"></i>
                     
@@ -1026,7 +1026,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Profile Card (Left) -->
                 <div class="profile-card">
                     <div class="profile-avatar">
-                        <img src="https://i.pravatar.cc/150?img=12" alt="<?php echo htmlspecialchars($admin['full_name']); ?>" id="avatarImage">
+                        <img src="" alt="<?php echo htmlspecialchars($admin['full_name']); ?>" id="avatarImage">
                         <div class="avatar-upload">
                             <i class="fas fa-camera"></i>
                             <input type="file" id="avatarInput" accept="image/*">
@@ -1202,48 +1202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <!-- Preferences Tab -->
-                    <div class="tab-content" id="preferences-tab">
-                        <div class="info-card">
-                            <h3><i class="fas fa-sliders-h"></i> Préférences</h3>
-                            <form method="POST" id="preferencesForm">
-                                <input type="hidden" name="action" value="update_preferences">
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="theme">Thème de l'interface</label>
-                                        <select id="theme" name="theme">
-                                            <option value="light" selected>Clair</option>
-                                            <option value="dark">Sombre</option>
-                                            <option value="auto">Auto (système)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="language">Langue</label>
-                                        <select id="language" name="language">
-                                            <option value="fr" selected>Français</option>
-                                            <option value="en">Anglais</option>
-                                            <option value="es">Espagnol</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 25px;">
-                                            <input type="checkbox" id="notifications" name="notifications" checked>
-                                            <label for="notifications">Activer les notifications par email</label>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-save"></i> Enregistrer les préférences
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    
 
                     <!-- Activity Tab -->
                     <div class="tab-content" id="activity-tab">

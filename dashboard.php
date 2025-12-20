@@ -892,7 +892,7 @@ if ($isLoggedIn) {
                         <i class="fas fa-euro-sign"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>€<?php echo number_format($stats['monthly_revenue'], 2, ',', ' '); ?></h3>
+                        <h3><?php echo number_format($stats['monthly_revenue'], 2, ',', ' '); ?>DA</h3>
                         <p>Revenu ce mois</p>
                     </div>
                 </div>

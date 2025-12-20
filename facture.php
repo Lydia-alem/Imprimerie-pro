@@ -1281,7 +1281,7 @@ if (isset($_GET['bl_id'])) {
                     <input type="text" placeholder="Rechercher...">
                 </div>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="" alt="Admin">
                     <span>Admin</span>
                 </div>
             </div>
@@ -1989,8 +1989,8 @@ if (isset($_GET['bl_id'])) {
                              onerror="this.src='REM.jpg'">
                     </div>
                     
-                    <p>123 Rue d'Impression, Alger Centre, Algérie</p>
-                    <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
+                    <p>123 Rue d'Impression, Setif Centre, Algérie</p>
+                    <p>Tél:0660639631 | Email: Rymemballagemoderne@gmail.com</p>
                     <p>NIF: 123456789012345</p>
                 </div>
 
@@ -2008,9 +2008,9 @@ if (isset($_GET['bl_id'])) {
                         <h4>Émise par:</h4>
                         <p><strong>IMPRIMERIE PRO</strong></p>
                         <p>123 Rue d'Impression</p>
-                        <p>Alger Centre, Algérie</p>
-                        <p>Tél: 021 23 45 67</p>
-                        <p>Email: contact@imprimerie-pro.dz</p>
+                        <p>Setif Centre, Algérie</p>
+                        <p>Tél: 0660639631</p>
+                        <p>Email: Rymemballagemoderne@gmail.com</p>
                     </div>
                     <div class="print-client">
                         <h4>Facturé à:</h4>
