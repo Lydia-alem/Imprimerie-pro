@@ -1144,7 +1144,7 @@ if (isset($_GET['update_status']) && isset($_GET['quote_id']) && isset($_GET['st
                     <div class="subtitle">Voir tous les devis</div>
                 </div>
                 
-                <div class="action-card" onclick="window.open('print_devis_template.php', '_blank')">
+                <div class="action-card" onclick="window.open('print_devis.php', '_blank')">
                     <i class="fas fa-print"></i>
                     <h4>Imprimer</h4>
                     <div class="subtitle">Modèle d'impression</div>
