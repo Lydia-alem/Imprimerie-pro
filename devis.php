@@ -1138,7 +1138,7 @@ if (isset($_GET['update_status']) && isset($_GET['quote_id']) && isset($_GET['st
                     <div class="subtitle">Créer un devis</div>
                 </div>
                 
-                <div class="action-card" onclick="window.open('liste_devis.php', '_blank')">
+                <div class="action-card" onclick="window.open('listedesdevis.php', '_blank')">
                     <i class="fas fa-list"></i>
                     <h4>Liste Devis</h4>
                     <div class="subtitle">Voir tous les devis</div>
