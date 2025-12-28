@@ -23,8 +23,7 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// Vérifier si l'utilisateur est connecté (à adapter selon votre système d'authentification)
-$isAdmin = true; // Pour la démo - à remplacer par votre vérification
+
 
 // Récupérer les paramètres de filtrage
 $status_filter = $_GET['status'] ?? 'all';
@@ -82,8 +81,99 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
     $update_stmt->execute([$new_status, $order_id]);
     
     // Redirection pour éviter la resoumission du formulaire
-    header("Location: commande_client.php?success=1");
+    header("Location: commande.php?success=1");
     exit();
+}
+
+// Traitement pour ajouter un produit à une commande
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_product'])) {
+    $order_id = $_POST['order_id'];
+    $product_id = $_POST['product_id'];
+    $quantity = $_POST['quantity'];
+    
+    // Récupérer le prix du produit
+    $product_stmt = $pdo->prepare("SELECT price FROM products WHERE id = ?");
+    $product_stmt->execute([$product_id]);
+    $product = $product_stmt->fetch();
+    
+    if ($product) {
+        $price = $product['price'];
+        $subtotal = $price * $quantity;
+        
+        // Ajouter l'article à la commande
+        $insert_stmt = $pdo->prepare("
+            INSERT INTO order_items (order_id, product_id, quantity, price, subtotal) 
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $insert_stmt->execute([$order_id, $product_id, $quantity, $price, $subtotal]);
+        
+        // Recalculer le total de la commande
+        $total_stmt = $pdo->prepare("
+            UPDATE orders SET total = (
+                SELECT SUM(subtotal) FROM order_items WHERE order_id = ?
+            ) WHERE id = ?
+        ");
+        $total_stmt->execute([$order_id, $order_id]);
+        
+        header("Location: commande.php?action=product_added&order_id=" . $order_id);
+        exit();
+    }
+}
+
+// Traitement pour ajouter un article personnalisé
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_custom_item'])) {
+    $order_id = $_POST['order_id'];
+    $description = $_POST['description'];
+    $quantity = $_POST['quantity'];
+    $price = $_POST['price'];
+    $subtotal = $price * $quantity;
+    
+    $insert_stmt = $pdo->prepare("
+        INSERT INTO order_items (order_id, description, quantity, price, subtotal) 
+        VALUES (?, ?, ?, ?, ?)
+    ");
+    $insert_stmt->execute([$order_id, $description, $quantity, $price, $subtotal]);
+    
+    // Recalculer le total
+    $total_stmt = $pdo->prepare("
+        UPDATE orders SET total = (
+            SELECT SUM(subtotal) FROM order_items WHERE order_id = ?
+        ) WHERE id = ?
+    ");
+    $total_stmt->execute([$order_id, $order_id]);
+    
+    header("Location: commande.php?action=custom_added&order_id=" . $order_id);
+    exit();
+}
+
+// Traitement pour supprimer un article
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_item'])) {
+    $item_id = $_POST['item_id'];
+    $order_id = $_POST['order_id'];
+    
+    // Récupérer l'order_id avant suppression
+    $stmt = $pdo->prepare("SELECT order_id FROM order_items WHERE id = ?");
+    $stmt->execute([$item_id]);
+    $item = $stmt->fetch();
+    
+    if ($item) {
+        $order_id = $item['order_id'];
+        
+        // Supprimer l'article
+        $delete_stmt = $pdo->prepare("DELETE FROM order_items WHERE id = ?");
+        $delete_stmt->execute([$item_id]);
+        
+        // Recalculer le total
+        $total_stmt = $pdo->prepare("
+            UPDATE orders SET total = COALESCE((
+                SELECT SUM(subtotal) FROM order_items WHERE order_id = ?
+            ), 0) WHERE id = ?
+        ");
+        $total_stmt->execute([$order_id, $order_id]);
+        
+        header("Location: commande.php?action=item_deleted&order_id=" . $order_id);
+        exit();
+    }
 }
 
 // Fonction pour obtenir le texte du statut en français
@@ -129,19 +219,24 @@ function getOrderItems($pdo, $order_id) {
     return $stmt->fetchAll();
 }
 
-// Fonction pour vérifier si une échéance est dépassée (CORRIGÉE)
+// Fonction pour obtenir tous les produits
+function getAllProducts($pdo) {
+    return $pdo->query("SELECT * FROM products ORDER BY name")->fetchAll();
+}
+
+// Fonction pour vérifier si une échéance est dépassée
 function isDeadlinePassed($deadline) {
     if (!$deadline) {
         return false;
     }
     
     $deadlineDate = strtotime($deadline);
-    $today = time();
+    $today = strtotime(date('Y-m-d'));
     
     return $deadlineDate < $today;
 }
 
-// Fonction pour formater une date (CORRIGÉE)
+// Fonction pour formater une date
 function formatDate($date) {
     if (!$date) {
         return 'Non définie';
@@ -150,16 +245,17 @@ function formatDate($date) {
     return date('d/m/Y', strtotime($date));
 }
 
-// Fonction pour calculer les jours restants (CORRIGÉE)
+// Fonction pour calculer les jours restants
 function getDaysRemaining($deadline) {
     if (!$deadline) {
         return null;
     }
     
     $deadlineDate = strtotime($deadline);
-    $today = time();
+    $today = strtotime(date('Y-m-d'));
     $diffTime = $deadlineDate - $today;
-    return ceil($diffTime / (1000 * 60 * 60 * 24));
+    $daysRemaining = floor($diffTime / (60 * 60 * 24));
+    return $daysRemaining;
 }
 ?>
 
@@ -232,15 +328,6 @@ function getDaysRemaining($deadline) {
             width: 4px;
             height: 100%;
             background: var(--accent);
-        }
-
-        .sidebar-header img {
-            width: 45px;
-            height: 45px;
-            background: white;
-            border-radius: 10px;
-            padding: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
         .sidebar-header h2 {
@@ -353,6 +440,34 @@ function getDaysRemaining($deadline) {
         .content {
             padding: 30px;
             flex: 1;
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
         }
 
         /* Filter Section */
@@ -607,6 +722,7 @@ function getDaysRemaining($deadline) {
             gap: 10px;
         }
 
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -624,7 +740,7 @@ function getDaysRemaining($deadline) {
             background: white;
             padding: 30px;
             border-radius: 10px;
-            max-width: 600px;
+            max-width: 800px;
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
@@ -649,20 +765,32 @@ function getDaysRemaining($deadline) {
             color: var(--gray);
         }
 
-        /* Success Message */
-        .alert {
-            padding: 15px 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+        /* Tabs */
+        .tabs {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
         }
 
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--secondary);
+            color: var(--secondary);
+            font-weight: 600;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         /* Responsive */
@@ -735,9 +863,9 @@ function getDaysRemaining($deadline) {
         <div class="sidebar-menu">
             <ul>
                 <li>
-                    <a href="dashboard.php">
+                    <a href="commande_client.php">
                         <i class="fas fa-home"></i>
-                        <span>Tableau de Bord</span>
+                        <span>Accueil</span>
                     </a>
                 </li>
                 <li class="active">
@@ -770,6 +898,12 @@ function getDaysRemaining($deadline) {
                         <span>Facturation</span>
                     </a>
                 </li>
+                <li>
+                    <a href="logout.php">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Déconnexion</span>
+                    </a>
+                </li>
             </ul>
         </div>
     </div>
@@ -791,6 +925,25 @@ function getDaysRemaining($deadline) {
                 <i class="fas fa-check-circle"></i>
                 Statut de la commande mis à jour avec succès !
             </div>
+            <?php endif; ?>
+
+            <?php if (isset($_GET['action'])): ?>
+                <?php if ($_GET['action'] == 'product_added'): ?>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Produit ajouté à la commande avec succès !
+                </div>
+                <?php elseif ($_GET['action'] == 'custom_added'): ?>
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i>
+                    Article personnalisé ajouté à la commande avec succès !
+                </div>
+                <?php elseif ($_GET['action'] == 'item_deleted'): ?>
+                <div class="alert alert-info">
+                    <i class="fas fa-trash-alt"></i>
+                    Article supprimé de la commande avec succès !
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
 
             <!-- Filter Section -->
@@ -876,13 +1029,16 @@ function getDaysRemaining($deadline) {
                                 <span class="info-value"><?php echo $order['client_phone'] ?: 'Non renseigné'; ?></span>
                             </div>
                             <div class="info-item">
+                                <span class="info-label">Email</span>
+                                <span class="info-value"><?php echo $order['client_email'] ?: 'Non renseigné'; ?></span>
+                            </div>
+                            <div class="info-item">
                                 <span class="info-label">Date création</span>
                                 <span class="info-value"><?php echo date('d/m/Y', strtotime($order['created_at'])); ?></span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Échéance</span>
                                 <?php
-                                // CORRECTION DE L'ERREUR : Vérifier si la date d'échéance existe
                                 $deadlineClass = '';
                                 $deadlineText = formatDate($order['deadline']);
                                 
@@ -894,6 +1050,8 @@ function getDaysRemaining($deadline) {
                                     } elseif ($daysRemaining <= 3) {
                                         $deadlineClass = 'deadline-urgent';
                                         $deadlineText .= ' <i class="fas fa-exclamation-triangle"></i> (' . $daysRemaining . ' jour(s))';
+                                    } else {
+                                        $deadlineText .= ' (' . $daysRemaining . ' jour(s))';
                                     }
                                 }
                                 ?>
@@ -922,6 +1080,7 @@ function getDaysRemaining($deadline) {
                                         <th>Quantité</th>
                                         <th>Prix unitaire</th>
                                         <th>Sous-total</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -929,7 +1088,7 @@ function getDaysRemaining($deadline) {
                                     <tr>
                                         <td>
                                             <strong><?php echo $item['product_name'] ?: 'Article personnalisé'; ?></strong>
-                                            <?php if ($item['description']): ?>
+                                            <?php if ($item['description'] && !$item['product_name']): ?>
                                             <div style="font-size: 0.85rem; color: var(--gray); margin-top: 5px;">
                                                 <?php echo nl2br(htmlspecialchars($item['description'])); ?>
                                             </div>
@@ -938,6 +1097,15 @@ function getDaysRemaining($deadline) {
                                         <td><?php echo $item['quantity']; ?></td>
                                         <td><?php echo number_format($item['price'], 2, ',', ' '); ?> DA</td>
                                         <td><?php echo number_format($item['subtotal'], 2, ',', ' '); ?> DA</td>
+                                        <td>
+                                            <form method="POST" style="display: inline;">
+                                                <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
+                                                <input type="hidden" name="order_id" value="<?php echo $order['id']; ?>">
+                                                <button type="submit" name="delete_item" class="btn btn-sm btn-danger" onclick="return confirm('Supprimer cet article ?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
                                     </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -963,14 +1131,15 @@ function getDaysRemaining($deadline) {
                                 <button class="btn btn-sm btn-secondary" onclick="showOrderDetails(<?php echo $order['id']; ?>)">
                                     <i class="fas fa-eye"></i> Voir détails
                                 </button>
-                                <a href="facture.php?order_id=<?php echo $order['id']; ?>" class="btn btn-sm btn-success">
+                                <button class="btn btn-sm btn-success" onclick="showAddProductModal(<?php echo $order['id']; ?>)">
+                                    <i class="fas fa-plus"></i> Ajouter produit
+                                </button>
+                                <button class="btn btn-sm btn-warning" onclick="showAddCustomModal(<?php echo $order['id']; ?>)">
+                                    <i class="fas fa-edit"></i> Article perso
+                                </button>
+                                <a href="facture.php?order_id=<?php echo $order['id']; ?>" class="btn btn-sm btn-info">
                                     <i class="fas fa-file-invoice"></i> Facture
                                 </a>
-                                <?php if ($order['status'] == 'pending'): ?>
-                                <button class="btn btn-sm btn-danger" onclick="cancelOrder(<?php echo $order['id']; ?>)">
-                                    <i class="fas fa-times"></i> Annuler
-                                </button>
-                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -988,33 +1157,124 @@ function getDaysRemaining($deadline) {
                 <button class="close-modal" onclick="closeModal()">&times;</button>
             </div>
             <div id="orderDetailsContent">
-                <!-- Détails seront chargés ici -->
+                <!-- Détails seront chargés dynamiquement -->
             </div>
+        </div>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ajouter un produit à la commande</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form method="POST" id="addProductForm">
+                <input type="hidden" name="order_id" id="addProductOrderId">
+                <div class="form-group">
+                    <label for="product_id">Produit</label>
+                    <select name="product_id" id="product_id" class="form-control" required>
+                        <option value="">Sélectionner un produit</option>
+                        <?php 
+                        $products = getAllProducts($pdo);
+                        foreach ($products as $product): 
+                        ?>
+                        <option value="<?php echo $product['id']; ?>">
+                            <?php echo htmlspecialchars($product['name']); ?> - 
+                            <?php echo number_format($product['price'], 2, ',', ' '); ?> DA
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="quantity">Quantité</label>
+                    <input type="number" name="quantity" id="quantity" class="form-control" min="1" value="1" required>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                    <button type="submit" name="add_product" class="btn btn-primary">Ajouter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Custom Item Modal -->
+    <div id="addCustomModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ajouter un article personnalisé</h3>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <form method="POST" id="addCustomForm">
+                <input type="hidden" name="order_id" id="addCustomOrderId">
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea name="description" id="description" class="form-control" rows="3" required placeholder="Description de l'article..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="custom_quantity">Quantité</label>
+                    <input type="number" name="quantity" id="custom_quantity" class="form-control" min="1" value="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="price">Prix unitaire (DA)</label>
+                    <input type="number" name="price" id="price" class="form-control" min="0" step="0.01" required>
+                </div>
+                <div style="margin-top: 20px; text-align: right;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                    <button type="submit" name="add_custom_item" class="btn btn-primary">Ajouter</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <script>
         // Afficher les détails d'une commande
         function showOrderDetails(orderId) {
-            fetch('get_order_details.php?order_id=' + orderId)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('orderDetailsContent').innerHTML = data;
+            // Créer une requête AJAX pour obtenir les détails
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'get_order_details.php?order_id=' + orderId, true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('orderDetailsContent').innerHTML = xhr.responseText;
                     document.getElementById('orderDetailsModal').style.display = 'flex';
-                })
-                .catch(error => {
+                } else {
                     document.getElementById('orderDetailsContent').innerHTML = 
-                        '<p>Erreur lors du chargement des détails.</p>';
+                        '<div class="alert alert-danger">Erreur lors du chargement des détails.</div>';
                     document.getElementById('orderDetailsModal').style.display = 'flex';
-                });
+                }
+            };
+            xhr.send();
         }
 
-        // Fermer la modal
+        // Afficher la modal pour ajouter un produit
+        function showAddProductModal(orderId) {
+            document.getElementById('addProductOrderId').value = orderId;
+            document.getElementById('addProductModal').style.display = 'flex';
+        }
+
+        // Afficher la modal pour ajouter un article personnalisé
+        function showAddCustomModal(orderId) {
+            document.getElementById('addCustomOrderId').value = orderId;
+            document.getElementById('addCustomModal').style.display = 'flex';
+        }
+
+        // Fermer toutes les modals
         function closeModal() {
-            document.getElementById('orderDetailsModal').style.display = 'none';
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
         }
 
-        // Annuler une commande
+        // Fermer la modal en cliquant à l'extérieur
+        window.onclick = function(event) {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // Annuler une commande (via changement de statut)
         function cancelOrder(orderId) {
             if (confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
                 const form = document.createElement('form');
@@ -1041,14 +1301,6 @@ function getDaysRemaining($deadline) {
                 form.appendChild(submitInput);
                 document.body.appendChild(form);
                 form.submit();
-            }
-        }
-
-        // Fermer la modal en cliquant à l'extérieur
-        window.onclick = function(event) {
-            const modal = document.getElementById('orderDetailsModal');
-            if (event.target === modal) {
-                closeModal();
             }
         }
     </script>
