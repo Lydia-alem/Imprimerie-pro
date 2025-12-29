@@ -579,7 +579,6 @@ $total_ttc = $total_ht + $total_tva;
             <?php endif; ?>
         </div>
     </div>
-    
 
     <script>
         // Impression automatique au chargement de la page
