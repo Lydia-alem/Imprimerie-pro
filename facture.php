@@ -1,232 +1,3 @@
-<?php
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root';
-$password = 'admine';
-
-// Create connection
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    die("Connection failed: " . $e->getMessage());
-}
-
-// Fetch data from database
-try {
-    // Fetch clients
-    $clientsStmt = $pdo->query("SELECT * FROM clients ORDER BY name");
-    $clients = $clientsStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Fetch products
-    $productsStmt = $pdo->query("SELECT * FROM products ORDER BY name");
-    $products = $productsStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Fetch existing invoices
-    $invoicesStmt = $pdo->query("
-        SELECT i.*, c.name as client_name, c.email, c.phone, c.address
-        FROM invoices i 
-        LEFT JOIN clients c ON i.client_id = c.id 
-        ORDER BY i.created_at DESC 
-        LIMIT 50
-    ");
-    $invoices = $invoicesStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Fetch existing orders (BL)
-    $ordersStmt = $pdo->query("
-        SELECT o.*, c.name as client_name 
-        FROM orders o 
-        LEFT JOIN clients c ON o.client_id = c.id 
-        ORDER BY o.created_at DESC 
-        LIMIT 50
-    ");
-    $orders = $ordersStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Generate next invoice number
-    $lastInvoiceStmt = $pdo->query("SELECT id FROM invoices ORDER BY id DESC LIMIT 1");
-    $lastInvoice = $lastInvoiceStmt->fetch(PDO::FETCH_ASSOC);
-    $nextInvoiceNumber = "FAC-" . date('Y') . "-" . str_pad(($lastInvoice ? $lastInvoice['id'] + 1 : 1), 4, '0', STR_PAD_LEFT);
-    
-    // Generate next BL number
-    $lastOrderStmt = $pdo->query("SELECT id FROM orders ORDER BY id DESC LIMIT 1");
-    $lastOrder = $lastOrderStmt->fetch(PDO::FETCH_ASSOC);
-    $nextBLNumber = "BL-" . date('Y') . "-" . str_pad(($lastOrder ? $lastOrder['id'] + 1 : 1), 4, '0', STR_PAD_LEFT);
-    
-} catch(PDOException $e) {
-    die("Erreur lors du chargement des données: " . $e->getMessage());
-}
-
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['save_invoice'])) {
-        try {
-            $pdo->beginTransaction();
-            
-            // Save invoice
-            $client_id = $_POST['client_id'];
-            $invoice_number = $_POST['invoice_number'];
-            $invoice_date = $_POST['invoice_date'];
-            $due_date = $_POST['due_date'];
-            $payment_terms = $_POST['payment_terms'];
-            $delivery_terms = $_POST['delivery_terms'];
-            $subtotal = $_POST['subtotal'];
-            $tva_rate = $_POST['tva_rate'];
-            $tva_amount = $_POST['tva_amount'];
-            $total = $_POST['total'];
-            $notes = $_POST['notes'];
-            $status = 'unpaid';
-            
-            $invoiceStmt = $pdo->prepare("
-                INSERT INTO invoices (client_id, status, total, vat, created_at) 
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $invoiceStmt->execute([
-                $client_id, 
-                $status, 
-                $total, 
-                $tva_amount,
-                date('Y-m-d H:i:s')
-            ]);
-            $invoice_id = $pdo->lastInsertId();
-            
-            // Save invoice items
-            $descriptions = $_POST['item_description'] ?? [];
-            $quantities = $_POST['item_quantity'] ?? [];
-            $prices = $_POST['item_price'] ?? [];
-            $units = $_POST['item_unit'] ?? [];
-            
-            for ($i = 0; $i < count($descriptions); $i++) {
-                if (!empty($descriptions[$i])) {
-                    $itemStmt = $pdo->prepare("
-                        INSERT INTO invoice_items (invoice_id, description, quantity, price, subtotal) 
-                        VALUES (?, ?, ?, ?, ?)
-                    ");
-                    $itemStmt->execute([
-                        $invoice_id,
-                        $descriptions[$i],
-                        $quantities[$i],
-                        $prices[$i],
-                        $quantities[$i] * $prices[$i]
-                    ]);
-                }
-            }
-            
-            $pdo->commit();
-            
-            // Refresh page to show new invoice
-            header("Location: facturation.php?success=1&invoice_id=" . $invoice_id);
-            exit();
-            
-        } catch(PDOException $e) {
-            $pdo->rollBack();
-            $error_message = "Erreur lors de l'enregistrement: " . $e->getMessage();
-        }
-    }
-    
-    if (isset($_POST['save_bl'])) {
-        try {
-            $pdo->beginTransaction();
-            
-            // Save order (BL)
-            $client_id = $_POST['bl_client_id'];
-            $bl_number = $_POST['bl_number'];
-            $bl_date = $_POST['bl_date'];
-            $delivery_person = $_POST['delivery_person'];
-            $vehicle = $_POST['vehicle'];
-            $reference = $_POST['reference'];
-            $conditions = $_POST['conditions'];
-            $notes = $_POST['bl_notes'];
-            $status = 'pending';
-            
-            $orderStmt = $pdo->prepare("
-                INSERT INTO orders (client_id, status, deadline, total, created_at) 
-                VALUES (?, ?, ?, ?, ?)
-            ");
-            $orderStmt->execute([
-                $client_id, 
-                $status, 
-                $bl_date, 
-                0,
-                date('Y-m-d H:i:s')
-            ]);
-            $order_id = $pdo->lastInsertId();
-            
-            // Save order items
-            $descriptions = $_POST['bl_item_description'] ?? [];
-            $quantities = $_POST['bl_item_quantity'] ?? [];
-            $units = $_POST['bl_item_unit'] ?? [];
-            
-            for ($i = 0; $i < count($descriptions); $i++) {
-                if (!empty($descriptions[$i])) {
-                    $itemStmt = $pdo->prepare("
-                        INSERT INTO order_items (order_id, description, quantity, price, subtotal) 
-                        VALUES (?, ?, ?, ?, ?)
-                    ");
-                    $itemStmt->execute([
-                        $order_id,
-                        $descriptions[$i] . " (" . ($units[$i] ?? 'unité') . ")",
-                        $quantities[$i],
-                        0,
-                        0
-                    ]);
-                }
-            }
-            
-            $pdo->commit();
-            
-            // Refresh page to show new BL
-            header("Location: facturation.php?success=2&bl_id=" . $order_id);
-            exit();
-            
-        } catch(PDOException $e) {
-            $pdo->rollBack();
-            $error_message = "Erreur lors de l'enregistrement: " . $e->getMessage();
-        }
-    }
-}
-
-// Get invoice data for preview if invoice_id is set
-$preview_invoice = null;
-$preview_invoice_items = null;
-if (isset($_GET['invoice_id'])) {
-    $invoice_id = $_GET['invoice_id'];
-    $stmt = $pdo->prepare("
-        SELECT i.*, c.name as client_name, c.email, c.phone, c.address 
-        FROM invoices i 
-        LEFT JOIN clients c ON i.client_id = c.id 
-        WHERE i.id = ?
-    ");
-    $stmt->execute([$invoice_id]);
-    $preview_invoice = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($preview_invoice) {
-        $itemsStmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
-        $itemsStmt->execute([$invoice_id]);
-        $preview_invoice_items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-
-// Get BL data for preview if bl_id is set
-$preview_bl = null;
-$preview_bl_items = null;
-if (isset($_GET['bl_id'])) {
-    $bl_id = $_GET['bl_id'];
-    $stmt = $pdo->prepare("
-        SELECT o.*, c.name as client_name, c.email, c.phone, c.address 
-        FROM orders o 
-        LEFT JOIN clients c ON o.client_id = c.id 
-        WHERE o.id = ?
-    ");
-    $stmt->execute([$bl_id]);
-    $preview_bl = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($preview_bl) {
-        $itemsStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
-        $itemsStmt->execute([$bl_id]);
-        $preview_bl_items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-}
-?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -524,11 +295,11 @@ if (isset($_GET['bl_id'])) {
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
         }
 
         .items-table th, .items-table td {
-            padding: 10px 12px;
+            padding: 8px 6px;
             text-align: left;
             border-bottom: 1px solid #eee;
         }
@@ -537,16 +308,17 @@ if (isset($_GET['bl_id'])) {
             background-color: #f8f9fa;
             color: var(--primary);
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
+            white-space: nowrap;
         }
 
         .items-table input, .items-table select {
             width: 100%;
-            padding: 8px;
+            padding: 6px 4px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
         }
 
         .items-table .total-cell {
@@ -664,7 +436,7 @@ if (isset($_GET['bl_id'])) {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
         .items-table-preview th {
@@ -676,7 +448,7 @@ if (isset($_GET['bl_id'])) {
         }
 
         .items-table-preview td {
-            padding: 10px;
+            padding: 8px 6px;
             border-bottom: 1px solid #eee;
         }
 
@@ -803,8 +575,8 @@ if (isset($_GET['bl_id'])) {
 
         .print-content {
             background: white;
-            width: 80%;
-            max-width: 800px;
+            width: 90%;
+            max-width: 1000px;
             border-radius: 10px;
             padding: 30px;
             position: relative;
@@ -898,20 +670,20 @@ if (isset($_GET['bl_id'])) {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 30px;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
         }
 
         .print-items-table th {
             background: #2c3e50;
             color: white;
-            padding: 12px 10px;
+            padding: 10px 6px;
             text-align: left;
             font-weight: 500;
             border: 1px solid #ddd;
         }
 
         .print-items-table td {
-            padding: 10px;
+            padding: 8px 6px;
             border: 1px solid #ddd;
         }
 
@@ -1127,7 +899,7 @@ if (isset($_GET['bl_id'])) {
 
         /* Unit column in items table */
         .unit-column {
-            width: 80px;
+            width: 70px;
         }
 
         /* Small buttons */
@@ -1175,6 +947,16 @@ if (isset($_GET['bl_id'])) {
             .invoice-info-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .items-table th, .items-table td {
+                padding: 6px 4px;
+                font-size: 0.7rem;
+            }
+            
+            .items-table input, .items-table select {
+                padding: 4px 2px;
+                font-size: 0.7rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -1193,6 +975,10 @@ if (isset($_GET['bl_id'])) {
             .invoice-meta {
                 grid-template-columns: 1fr;
             }
+            
+            .stats-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media print {
@@ -1209,6 +995,7 @@ if (isset($_GET['bl_id'])) {
                 width: 100%;
                 box-shadow: none;
                 padding: 20px;
+                background: white;
             }
             .close-modal, .no-print {
                 display: none;
@@ -1216,6 +1003,9 @@ if (isset($_GET['bl_id'])) {
             .print-header .logo {
                 width: 100px;
                 height: 100px;
+            }
+            @page {
+                margin: 20mm;
             }
         }
 
@@ -1235,6 +1025,57 @@ if (isset($_GET['bl_id'])) {
 
         .bl-form {
             border-top: 5px solid var(--bl-color);
+        }
+
+        /* Amount in letters */
+        .amount-in-letters {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-style: italic;
+        }
+
+        .amount-in-letters p {
+            margin: 0;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        /* TVA column */
+        .tva-column {
+            width: 60px;
+        }
+
+        /* Client info fields */
+        .client-additional-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        /* BL item columns */
+        .bl-price-col { width: 100px; }
+        .bl-total-col { width: 100px; }
+        .bl-palettes-col { width: 80px; }
+        .bl-action-col { width: 50px; }
+
+        /* Search results highlight */
+        .highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .client-additional-info .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .bl-price-col, .bl-total-col {
+                width: 80px;
+            }
         }
     </style>
 </head>
@@ -1278,7 +1119,7 @@ if (isset($_GET['bl_id'])) {
             <div class="header-right">
                 <div class="search-bar">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Rechercher...">
+                    <input type="text" id="globalSearch" placeholder="Rechercher...">
                 </div>
                 <div class="user-profile">
                     <img src="" alt="Admin">
@@ -1290,6 +1131,333 @@ if (isset($_GET['bl_id'])) {
         <!-- Content -->
         <div class="content">
             <!-- Success/Error Messages -->
+            <?php 
+            // Database connection
+            $host = '127.0.0.1:3306';
+            $dbname = 'imprimerie';
+            $username = 'root';
+            $password = 'admine';
+            
+            try {
+                $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+                $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            } catch(PDOException $e) {
+                die("Connection failed: " . $e->getMessage());
+            }
+            
+            // Fetch data from database
+            try {
+                // Fetch clients
+                $clientsStmt = $pdo->query("SELECT * FROM clients ORDER BY name");
+                $clients = $clientsStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Fetch existing invoices
+                $invoicesStmt = $pdo->query("
+                    SELECT i.*, c.name as client_name, c.email, c.phone, c.address
+                    FROM invoices i 
+                    LEFT JOIN clients c ON i.client_id = c.id 
+                    ORDER BY i.created_at DESC 
+                    LIMIT 50
+                ");
+                $invoices = $invoicesStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Fetch existing orders (BL)
+                $ordersStmt = $pdo->query("
+                    SELECT o.*, c.name as client_name 
+                    FROM orders o 
+                    LEFT JOIN clients c ON o.client_id = c.id 
+                    ORDER BY o.created_at DESC 
+                    LIMIT 50
+                ");
+                $orders = $ordersStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Generate next invoice number
+                $lastInvoiceStmt = $pdo->query("SELECT id FROM invoices ORDER BY id DESC LIMIT 1");
+                $lastInvoice = $lastInvoiceStmt->fetch(PDO::FETCH_ASSOC);
+                $nextInvoiceNumber = "FAC-" . date('Y') . "-" . str_pad(($lastInvoice ? $lastInvoice['id'] + 1 : 1), 4, '0', STR_PAD_LEFT);
+                
+                // Generate next BL number
+                $lastOrderStmt = $pdo->query("SELECT id FROM orders ORDER BY id DESC LIMIT 1");
+                $lastOrder = $lastOrderStmt->fetch(PDO::FETCH_ASSOC);
+                $nextBLNumber = "BL-" . date('Y') . "-" . str_pad(($lastOrder ? $lastOrder['id'] + 1 : 1), 4, '0', STR_PAD_LEFT);
+                
+            } catch(PDOException $e) {
+                die("Erreur lors du chargement des données: " . $e->getMessage());
+            }
+            
+            // Handle form submissions
+            if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+                if (isset($_POST['save_invoice'])) {
+                    try {
+                        $pdo->beginTransaction();
+                        
+                        // Save invoice
+                        $client_id = $_POST['client_id'];
+                        $invoice_number = $_POST['invoice_number'];
+                        $invoice_date = $_POST['invoice_date'];
+                        $due_date = $_POST['due_date'];
+                        $payment_terms = $_POST['payment_terms'];
+                        $delivery_terms = $_POST['delivery_terms'];
+                        $subtotal = $_POST['subtotal'];
+                        $tva_rate = $_POST['tva_rate'];
+                        $tva_amount = $_POST['tva_amount'];
+                        $total = $_POST['total'];
+                        $notes = $_POST['notes'];
+                        $status = 'unpaid';
+                        
+                        $invoiceStmt = $pdo->prepare("
+                            INSERT INTO invoices (client_id, status, total, vat, created_at) 
+                            VALUES (?, ?, ?, ?, ?)
+                        ");
+                        $invoiceStmt->execute([
+                            $client_id, 
+                            $status, 
+                            $total, 
+                            $tva_amount,
+                            date('Y-m-d H:i:s')
+                        ]);
+                        $invoice_id = $pdo->lastInsertId();
+                        
+                        // Save invoice items
+                        $descriptions = $_POST['item_description'] ?? [];
+                        $quantities = $_POST['item_quantity'] ?? [];
+                        $prices = $_POST['item_price'] ?? [];
+                        $units = $_POST['item_unit'] ?? [];
+                        $tva_rates = $_POST['item_tva_rate'] ?? [];
+                        
+                        for ($i = 0; $i < count($descriptions); $i++) {
+                            if (!empty($descriptions[$i])) {
+                                $itemStmt = $pdo->prepare("
+                                    INSERT INTO invoice_items (invoice_id, description, quantity, price, subtotal) 
+                                    VALUES (?, ?, ?, ?, ?)
+                                ");
+                                $itemStmt->execute([
+                                    $invoice_id,
+                                    $descriptions[$i] . " (" . ($units[$i] ?? 'unité') . ") - TVA " . ($tva_rates[$i] ?? '19') . "%",
+                                    $quantities[$i],
+                                    $prices[$i],
+                                    $quantities[$i] * $prices[$i]
+                                ]);
+                            }
+                        }
+                        
+                        $pdo->commit();
+                        
+                        // Refresh page to show new invoice
+                        header("Location:facturephp?success=1&invoice_id=" . $invoice_id);
+                        exit();
+                        
+                    } catch(PDOException $e) {
+                        $pdo->rollBack();
+                        $error_message = "Erreur lors de l'enregistrement: " . $e->getMessage();
+                    }
+                }
+                
+                if (isset($_POST['save_bl'])) {
+                    try {
+                        $pdo->beginTransaction();
+                        
+                        // Save order (BL)
+                        $client_id = $_POST['bl_client_id'];
+                        $bl_number = $_POST['bl_number'];
+                        $bl_date = $_POST['bl_date'];
+                        $delivery_person = $_POST['delivery_person'];
+                        $vehicle = $_POST['vehicle'];
+                        $reference = $_POST['reference'];
+                        $conditions = $_POST['conditions'];
+                        $notes = $_POST['bl_notes'];
+                        $status = 'pending';
+                        
+                        $orderStmt = $pdo->prepare("
+                            INSERT INTO orders (client_id, status, deadline, total, created_at) 
+                            VALUES (?, ?, ?, ?, ?)
+                        ");
+                        $orderStmt->execute([
+                            $client_id, 
+                            $status, 
+                            $bl_date, 
+                            0,
+                            date('Y-m-d H:i:s')
+                        ]);
+                        $order_id = $pdo->lastInsertId();
+                        
+                        // Save order items
+                        $descriptions = $_POST['bl_item_description'] ?? [];
+                        $quantities = $_POST['bl_item_quantity'] ?? [];
+                        $units = $_POST['bl_item_unit'] ?? [];
+                        $prices = $_POST['bl_item_price'] ?? [];
+                        $palettes = $_POST['bl_item_palettes'] ?? [];
+                        
+                        for ($i = 0; $i < count($descriptions); $i++) {
+                            if (!empty($descriptions[$i])) {
+                                $fullDescription = $descriptions[$i];
+                                $fullDescription .= " (" . ($units[$i] ?? 'unité') . ")";
+                                if (!empty($palettes[$i])) $fullDescription .= " | Palettes: " . $palettes[$i];
+                                
+                                $itemTotal = ($quantities[$i] ?? 0) * ($prices[$i] ?? 0);
+                                
+                                $itemStmt = $pdo->prepare("
+                                    INSERT INTO order_items (order_id, description, quantity, price, subtotal) 
+                                    VALUES (?, ?, ?, ?, ?)
+                                ");
+                                $itemStmt->execute([
+                                    $order_id,
+                                    $fullDescription,
+                                    $quantities[$i] ?? 1,
+                                    $prices[$i] ?? 0,
+                                    $itemTotal
+                                ]);
+                            }
+                        }
+                        
+                        $pdo->commit();
+                        
+                        // Refresh page to show new BL
+                        header("Location: facture.php?success=2&bl_id=" . $order_id);
+                        exit();
+                        
+                    } catch(PDOException $e) {
+                        $pdo->rollBack();
+                        $error_message = "Erreur lors de l'enregistrement: " . $e->getMessage();
+                    }
+                }
+            }
+            
+            // Get invoice data for preview if invoice_id is set
+            $preview_invoice = null;
+            $preview_invoice_items = null;
+            if (isset($_GET['invoice_id'])) {
+                $invoice_id = $_GET['invoice_id'];
+                $stmt = $pdo->prepare("
+                    SELECT i.*, c.name as client_name, c.email, c.phone, c.address 
+                    FROM invoices i 
+                    LEFT JOIN clients c ON i.client_id = c.id 
+                    WHERE i.id = ?
+                ");
+                $stmt->execute([$invoice_id]);
+                $preview_invoice = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($preview_invoice) {
+                    $itemsStmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
+                    $itemsStmt->execute([$invoice_id]);
+                    $preview_invoice_items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+            }
+            
+            // Get BL data for preview if bl_id is set
+            $preview_bl = null;
+            $preview_bl_items = null;
+            if (isset($_GET['bl_id'])) {
+                $bl_id = $_GET['bl_id'];
+                $stmt = $pdo->prepare("
+                    SELECT o.*, c.name as client_name, c.email, c.phone, c.address 
+                    FROM orders o 
+                    LEFT JOIN clients c ON o.client_id = c.id 
+                    WHERE o.id = ?
+                ");
+                $stmt->execute([$bl_id]);
+                $preview_bl = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($preview_bl) {
+                    $itemsStmt = $pdo->prepare("SELECT * FROM order_items WHERE order_id = ?");
+                    $itemsStmt->execute([$bl_id]);
+                    $preview_bl_items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                }
+            }
+            
+            // Fonction pour convertir les chiffres en lettres (en français)
+            function nombreEnLettres($nombre) {
+                $unites = array('', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf');
+                $dizaines = array('', 'dix', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix');
+                $exceptions = array(11 => 'onze', 12 => 'douze', 13 => 'treize', 14 => 'quatorze', 15 => 'quinze', 
+                                    16 => 'seize', 17 => 'dix-sept', 18 => 'dix-huit', 19 => 'dix-neuf');
+                
+                if ($nombre == 0) return 'zéro';
+                
+                $texte = '';
+                
+                // Millions
+                $millions = floor($nombre / 1000000);
+                if ($millions > 0) {
+                    $texte .= nombreEnLettres($millions) . ' million' . ($millions > 1 ? 's' : '') . ' ';
+                    $nombre %= 1000000;
+                }
+                
+                // Milliers
+                $milliers = floor($nombre / 1000);
+                if ($milliers > 0) {
+                    if ($milliers == 1) {
+                        $texte .= 'mille ';
+                    } else {
+                        $texte .= nombreEnLettres($milliers) . ' mille ';
+                    }
+                    $nombre %= 1000;
+                }
+                
+                // Centaines
+                $centaines = floor($nombre / 100);
+                if ($centaines > 0) {
+                    if ($centaines == 1) {
+                        $texte .= 'cent ';
+                    } else {
+                        $texte .= $unites[$centaines] . ' cent ';
+                    }
+                    $nombre %= 100;
+                }
+                
+                // Dizaines et unités
+                if ($nombre > 0) {
+                    if ($nombre < 10) {
+                        $texte .= $unites[$nombre] . ' ';
+                    } elseif ($nombre < 20) {
+                        $texte .= $exceptions[$nombre] . ' ';
+                    } else {
+                        $dizaine = floor($nombre / 10);
+                        $unite = $nombre % 10;
+                        
+                        if ($dizaine == 7 || $dizaine == 9) {
+                            // Cas spéciaux pour soixante-dix et quatre-vingt-dix
+                            $dizaine--;
+                            $unite += 10;
+                            $texte .= $dizaines[$dizaine];
+                            if ($unite > 0) {
+                                $texte .= '-' . $unites[$unite];
+                            }
+                            $texte .= ' ';
+                        } else {
+                            $texte .= $dizaines[$dizaine];
+                            if ($unite > 0) {
+                                if ($dizaine == 8) {
+                                    $texte .= ($unite == 1) ? '-un' : '-' . $unites[$unite];
+                                } else {
+                                    $texte .= ($unite == 1) ? ' et un' : '-' . $unites[$unite];
+                                }
+                            }
+                            $texte .= ' ';
+                        }
+                    }
+                }
+                
+                return trim($texte);
+            }
+            
+            // Fonction pour convertir un montant en lettres
+            function montantEnLettres($montant) {
+                $entier = floor($montant);
+                $decimal = round(($montant - $entier) * 100);
+                
+                $texte = nombreEnLettres($entier) . ' dinar';
+                if ($entier > 1) $texte .= 's';
+                
+                if ($decimal > 0) {
+                    $texte .= ' et ' . nombreEnLettres($decimal) . ' centime';
+                    if ($decimal > 1) $texte .= 's';
+                }
+                
+                return $texte;
+            }
+            ?>
+            
             <?php if (isset($_GET['success'])): ?>
                 <div class="alert alert-success">
                     <?php 
@@ -1353,6 +1521,40 @@ if (isset($_GET['bl_id'])) {
                                         <input type="text" id="client_contact" class="form-control" readonly>
                                     </div>
                                 </div>
+                                <div class="client-additional-info">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="client_nif">NIF Client</label>
+                                            <input type="text" id="client_nif" name="client_nif" class="form-control" value="">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="client_rc">RC Client</label>
+                                            <input type="text" id="client_rc" name="client_rc" class="form-control" value="">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="client_article_number">N° Article Client</label>
+                                            <input type="text" id="client_article_number" name="client_article_number" class="form-control" value="">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>Informations de l'entreprise</h3>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="company_nif">NIF Entreprise</label>
+                                        <input type="text" id="company_nif" name="company_nif" class="form-control" value="123456789012345">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="company_rc">RC Entreprise</label>
+                                        <input type="text" id="company_rc" name="company_rc" class="form-control" value="RC123456789">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="company_article_number">N° Article Entreprise</label>
+                                        <input type="text" id="company_article_number" name="company_article_number" class="form-control" value="ART987654321">
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-section">
@@ -1408,13 +1610,14 @@ if (isset($_GET['bl_id'])) {
                                 <table class="items-table">
                                     <thead>
                                         <tr>
-                                            <th width="40">N°</th>
+                                            <th width="30">N°</th>
                                             <th>Description</th>
-                                            <th width="80">Unité</th>
-                                            <th width="90">Quantité</th>
-                                            <th width="100">Prix unitaire (DA)</th>
-                                            <th width="100">Total (DA)</th>
-                                            <th width="50">Action</th>
+                                            <th width="60">Unité</th>
+                                            <th width="70">Quantité</th>
+                                            <th width="80">Prix unitaire (DA)</th>
+                                            <th width="60" class="tva-column">TVA %</th>
+                                            <th width="90">Total TTC (DA)</th>
+                                            <th width="40">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="invoiceItems">
@@ -1429,7 +1632,7 @@ if (isset($_GET['bl_id'])) {
                             <div class="form-section">
                                 <h3>Totaux</h3>
                                 <div class="total-row">
-                                    <span class="total-label">Sous-total:</span>
+                                    <span class="total-label">Sous-total HT:</span>
                                     <span class="total-value" id="subtotal">0.00 DA</span>
                                 </div>
                                 <div class="total-row">
@@ -1437,7 +1640,7 @@ if (isset($_GET['bl_id'])) {
                                     <span class="total-value" id="tvaAmount">0.00 DA</span>
                                 </div>
                                 <div class="total-row grand-total">
-                                    <span class="total-label">Total général:</span>
+                                    <span class="total-label">Total général TTC:</span>
                                     <span class="total-value" id="totalAmount">0.00 DA</span>
                                 </div>
                             </div>
@@ -1457,6 +1660,7 @@ if (isset($_GET['bl_id'])) {
                                 <h3>IMPRIMERIE PRO</h3>
                                 <p>123 Rue d'Impression, Alger Centre</p>
                                 <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
+                                <p>NIF: <span id="previewCompanyNif">123456789012345</span> | RC: <span id="previewCompanyRc">RC123456789</span> | N° Article: <span id="previewCompanyArticleNumber">ART987654321</span></p>
                             </div>
 
                             <div class="invoice-info-grid">
@@ -1466,13 +1670,18 @@ if (isset($_GET['bl_id'])) {
                                     <p>123 Rue d'Impression</p>
                                     <p>Alger Centre, Algérie</p>
                                     <p>Tél: 021 23 45 67</p>
-                                    <p>NIF: 123456789012345</p>
+                                    <p>NIF: <span id="previewCompanyNif2">123456789012345</span></p>
+                                    <p>RC: <span id="previewCompanyRc2">RC123456789</span></p>
+                                    <p>N° Article: <span id="previewCompanyArticleNumber2">ART987654321</span></p>
                                 </div>
                                 <div class="client-info">
                                     <h4>Facturé à:</h4>
                                     <p id="previewClientName">-</p>
                                     <p id="previewClientAddress">-</p>
                                     <p id="previewClientContact">-</p>
+                                    <p>NIF: <span id="previewClientNif">-</span></p>
+                                    <p>RC: <span id="previewClientRc">-</span></p>
+                                    <p>N° Article: <span id="previewClientArticleNumber">-</span></p>
                                 </div>
                             </div>
 
@@ -1498,37 +1707,42 @@ if (isset($_GET['bl_id'])) {
                             <table class="items-table-preview">
                                 <thead>
                                     <tr>
-                                        <th width="40">N°</th>
+                                        <th width="30">N°</th>
                                         <th>Description</th>
-                                        <th width="80">Unité</th>
-                                        <th width="90">Qté</th>
-                                        <th width="100">Prix U.</th>
-                                        <th width="100">Total</th>
+                                        <th width="60">Unité</th>
+                                        <th width="70">Qté</th>
+                                        <th width="80">Prix U.</th>
+                                        <th width="60">TVA %</th>
+                                        <th width="90">Total TTC</th>
                                     </tr>
                                 </thead>
                                 <tbody id="previewInvoiceItems">
                                     <!-- Les articles seront ajoutés ici dynamiquement -->
                                     <tr>
-                                        <td colspan="6" style="text-align: center; padding: 20px; color: #999;">
+                                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
                                             Aucun article ajouté
                                         </td>
                                     </tr>
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colspan="4" style="text-align: right; font-weight: 600;">Sous-total:</td>
+                                        <td colspan="5" style="text-align: right; font-weight: 600;">Sous-total HT:</td>
                                         <td colspan="2" id="previewSubtotal">0.00 DA</td>
                                     </tr>
                                     <tr>
-                                        <td colspan="4" style="text-align: right; font-weight: 600;">TVA (19%):</td>
+                                        <td colspan="5" style="text-align: right; font-weight: 600;">TVA (<span id="previewTvaPercent">19</span>%):</td>
                                         <td colspan="2" id="previewTvaAmount">0.00 DA</td>
                                     </tr>
                                     <tr>
-                                        <td colspan="4" style="text-align: right; font-weight: 700;">Total général:</td>
+                                        <td colspan="5" style="text-align: right; font-weight: 700;">Total général TTC:</td>
                                         <td colspan="2" id="previewTotalAmount">0.00 DA</td>
                                     </tr>
                                 </tfoot>
                             </table>
+
+                            <div class="amount-in-letters" id="previewAmountInLetters">
+                                Arrêtée la présente facture à la somme de : <strong>zéro dinar</strong>
+                            </div>
 
                             <div class="invoice-terms">
                                 <h4>Conditions et notes</h4>
@@ -1646,11 +1860,14 @@ if (isset($_GET['bl_id'])) {
                                 <table class="items-table">
                                     <thead>
                                         <tr>
-                                            <th width="40">N°</th>
-                                            <th>Description</th>
-                                            <th width="80">Unité</th>
-                                            <th width="90">Quantité</th>
-                                            <th width="50">Action</th>
+                                            <th width="30">N°</th>
+                                            <th>Désignation</th>
+                                            <th class="unit-column">Unité</th>
+                                            <th width="70">Qté</th>
+                                            <th class="bl-price-col">Prix U. (DA)</th>
+                                            <th class="bl-total-col">Total (DA)</th>
+                                            <th class="bl-palettes-col">Nb Pal</th>
+                                            <th class="bl-action-col">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="blItems">
@@ -1660,6 +1877,22 @@ if (isset($_GET['bl_id'])) {
                                 <button type="button" class="btn-add-item" id="addBLItem">
                                     <i class="fas fa-plus"></i> Ajouter un article
                                 </button>
+                            </div>
+
+                            <div class="form-section">
+                                <h3>Totaux du BL</h3>
+                                <div class="total-row">
+                                    <span class="total-label">Total quantité:</span>
+                                    <span class="total-value" id="blTotalQty">0</span>
+                                </div>
+                                <div class="total-row">
+                                    <span class="total-label">Total palettes:</span>
+                                    <span class="total-value" id="blTotalPalettes">0</span>
+                                </div>
+                                <div class="total-row grand-total">
+                                    <span class="total-label">Valeur totale:</span>
+                                    <span class="total-value" id="blTotalValue">0.00 DA</span>
+                                </div>
                             </div>
 
                             <div class="form-section">
@@ -1691,6 +1924,7 @@ if (isset($_GET['bl_id'])) {
                                 <h3>BON DE LIVRAISON</h3>
                                 <p>123 Rue d'Impression, Alger Centre</p>
                                 <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
+                                <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
                             </div>
 
                             <div class="bl-info-grid">
@@ -1700,6 +1934,9 @@ if (isset($_GET['bl_id'])) {
                                     <p>123 Rue d'Impression</p>
                                     <p>Alger Centre, Algérie</p>
                                     <p>Tél: 021 23 45 67</p>
+                                    <p>NIF: 123456789012345</p>
+                                    <p>RC: RC123456789</p>
+                                    <p>N° Article: ART987654321</p>
                                 </div>
                                 <div class="client-info">
                                     <h4>Destinataire:</h4>
@@ -1739,21 +1976,32 @@ if (isset($_GET['bl_id'])) {
                             <table class="items-table-preview">
                                 <thead>
                                     <tr>
-                                        <th width="40">N°</th>
-                                        <th>Description</th>
-                                        <th width="80">Unité</th>
-                                        <th width="90">Qté livrée</th>
-                                        <th width="100">Observations</th>
+                                        <th width="30">N°</th>
+                                        <th>Désignation</th>
+                                        <th width="50">Unité</th>
+                                        <th width="50">Qté</th>
+                                        <th width="70">Prix U.</th>
+                                        <th width="80">Total</th>
+                                        <th width="50">Nb Pal</th>
                                     </tr>
                                 </thead>
                                 <tbody id="previewBLItems">
                                     <!-- Les articles seront ajoutés ici dynamiquement -->
                                     <tr>
-                                        <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
+                                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
                                             Aucun article ajouté
                                         </td>
                                     </tr>
                                 </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3" style="text-align: right; font-weight: 600;">Totaux:</td>
+                                        <td id="previewBLTotalQty">0</td>
+                                        <td></td>
+                                        <td id="previewBLTotalValue">0.00 DA</td>
+                                        <td id="previewBLTotalPalettes">0</td>
+                                    </tr>
+                                </tfoot>
                             </table>
 
                             <div class="bl-terms">
@@ -1780,7 +2028,10 @@ if (isset($_GET['bl_id'])) {
                             </div>
 
                             <div class="bl-actions">
-                                <button type="button" class="btn btn-success" id="previewBL">
+                                <button type="button" class="btn btn-success" id="calculateBL">
+                                    <i class="fas fa-calculator"></i> Calculer
+                                </button>
+                                <button type="button" class="btn btn-primary" id="previewBL">
                                     <i class="fas fa-eye"></i> Prévisualiser
                                 </button>
                                 <button type="submit" class="btn btn-warning">
@@ -1846,12 +2097,12 @@ if (isset($_GET['bl_id'])) {
                             <tbody id="documentsList">
                                 <!-- Factures -->
                                 <?php foreach ($invoices as $invoice): ?>
-                                <tr>
+                                <tr class="document-row">
                                     <td>
                                         <i class="fas fa-file-invoice" style="color: #3498db;"></i> Facture
                                     </td>
                                     <td>FAC-<?php echo str_pad($invoice['id'], 4, '0', STR_PAD_LEFT); ?></td>
-                                    <td><?php echo htmlspecialchars($invoice['client_name'] ?? 'N/A'); ?></td>
+                                    <td class="client-name"><?php echo htmlspecialchars($invoice['client_name'] ?? 'N/A'); ?></td>
                                     <td><?php echo date('d/m/Y', strtotime($invoice['created_at'])); ?></td>
                                     <td><?php echo number_format($invoice['total'], 2, ',', ' '); ?> DA</td>
                                     <td>
@@ -1879,12 +2130,12 @@ if (isset($_GET['bl_id'])) {
                                 
                                 <!-- Bons de Livraison -->
                                 <?php foreach ($orders as $order): ?>
-                                <tr>
+                                <tr class="document-row">
                                     <td>
                                         <i class="fas fa-truck" style="color: #2ecc71;"></i> BL
                                     </td>
                                     <td>BL-<?php echo str_pad($order['id'], 4, '0', STR_PAD_LEFT); ?></td>
-                                    <td><?php echo htmlspecialchars($order['client_name'] ?? 'N/A'); ?></td>
+                                    <td class="client-name"><?php echo htmlspecialchars($order['client_name'] ?? 'N/A'); ?></td>
                                     <td><?php echo date('d/m/Y', strtotime($order['created_at'])); ?></td>
                                     <td>-</td>
                                     <td>
@@ -1986,12 +2237,12 @@ if (isset($_GET['bl_id'])) {
                 <div class="print-header">
                     <div class="logo">
                         <img src="logo.png" alt="Logo Imprimerie" 
-                             onerror="this.src='REM.jpg'">
+                             onerror="this.src='https://via.placeholder.com/100/3498db/ffffff?text=IP'">
                     </div>
-                    
+                    <h2>IMPRIMERIE PRO</h2>
                     <p>123 Rue d'Impression, Setif Centre, Algérie</p>
-                    <p>Tél:0660639631 | Email: Rymemballagemoderne@gmail.com</p>
-                    <p>NIF: 123456789012345</p>
+                    <p>Tél: 0660639631 | Email: Rymemballagemoderne@gmail.com</p>
+                    <p>NIF: <span id="printCompanyNif">123456789012345</span> | RC: <span id="printCompanyRc">RC123456789</span> | N° Article: <span id="printCompanyArticleNumber">ART987654321</span></p>
                 </div>
 
                 <div class="print-invoice-info">
@@ -2011,24 +2262,31 @@ if (isset($_GET['bl_id'])) {
                         <p>Setif Centre, Algérie</p>
                         <p>Tél: 0660639631</p>
                         <p>Email: Rymemballagemoderne@gmail.com</p>
+                        <p>NIF: <span id="printCompanyNif2">123456789012345</span></p>
+                        <p>RC: <span id="printCompanyRc2">RC123456789</span></p>
+                        <p>N° Article: <span id="printCompanyArticleNumber2">ART987654321</span></p>
                     </div>
                     <div class="print-client">
                         <h4>Facturé à:</h4>
                         <p id="printClientName">-</p>
                         <p id="printClientAddress">-</p>
                         <p id="printClientContact">-</p>
+                        <p>NIF: <span id="printClientNif">-</span></p>
+                        <p>RC: <span id="printClientRc">-</span></p>
+                        <p>N° Article: <span id="printClientArticleNumber">-</span></p>
                     </div>
                 </div>
 
                 <table class="print-items-table">
                     <thead>
                         <tr>
-                            <th width="40">N°</th>
+                            <th width="30">N°</th>
                             <th>Description</th>
-                            <th width="80">Unité</th>
-                            <th width="90">Qté</th>
-                            <th width="100">Prix U. (DA)</th>
-                            <th width="100">Total (DA)</th>
+                            <th width="50">Unité</th>
+                            <th width="60">Qté</th>
+                            <th width="70">Prix U. HT (DA)</th>
+                            <th width="50">TVA %</th>
+                            <th width="80">Total TTC (DA)</th>
                         </tr>
                     </thead>
                     <tbody id="printInvoiceItems">
@@ -2038,7 +2296,7 @@ if (isset($_GET['bl_id'])) {
 
                 <div class="print-totals">
                     <div class="print-total-row">
-                        <span>Sous-total:</span>
+                        <span>Sous-total HT:</span>
                         <span id="printSubtotal">0.00 DA</span>
                     </div>
                     <div class="print-total-row">
@@ -2046,9 +2304,13 @@ if (isset($_GET['bl_id'])) {
                         <span id="printTvaAmount">0.00 DA</span>
                     </div>
                     <div class="print-total-row print-grand-total">
-                        <span>Total à payer:</span>
+                        <span>Total à payer TTC:</span>
                         <span id="printTotalAmount">0.00 DA</span>
                     </div>
+                </div>
+
+                <div class="amount-in-letters" id="printAmountInLetters">
+                    Arrêtée la présente facture à la somme de : <strong>zéro dinar</strong>
                 </div>
 
                 <div class="print-terms">
@@ -2084,6 +2346,9 @@ if (isset($_GET['bl_id'])) {
                     <button class="btn btn-primary" id="doPrintInvoice">
                         <i class="fas fa-print"></i> Imprimer maintenant
                     </button>
+                    <button class="btn btn-info" style="margin-left: 10px;" onclick="downloadAsPDF('invoice')">
+                        <i class="fas fa-download"></i> Télécharger PDF
+                    </button>
                 </div>
             </div>
         </div>
@@ -2097,12 +2362,13 @@ if (isset($_GET['bl_id'])) {
             <div id="printBLContent">
                 <div class="print-header">
                     <div class="logo">
-                        <img src="logo.png" alt="Logo Imprimerie" 
-                             onerror="this.src='REM.jpg'">
+                        <img src="REM.jpg" alt="Logo Imprimerie" 
+                             onerror="this.src='https://via.placeholder.com/100/2ecc71/ffffff?text=BL'">
                     </div>
-                    
+                    <h2>IMPRIMERIE PRO</h2>
                     <p>123 Rue d'Impression, Alger Centre, Algérie</p>
                     <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
+                    <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
                 </div>
 
                 <div class="print-bl-info">
@@ -2121,6 +2387,9 @@ if (isset($_GET['bl_id'])) {
                         <p>123 Rue d'Impression</p>
                         <p>Alger Centre, Algérie</p>
                         <p>Tél: 021 23 45 67</p>
+                        <p>NIF: 123456789012345</p>
+                        <p>RC: RC123456789</p>
+                        <p>N° Article: ART987654321</p>
                     </div>
                     <div class="print-client">
                         <h4>Destinataire:</h4>
@@ -2131,7 +2400,7 @@ if (isset($_GET['bl_id'])) {
                 </div>
 
                 <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 0.9rem;">
                         <div>
                             <strong>Livreur:</strong> <span id="printDeliveryPerson">-</span>
                         </div>
@@ -2139,10 +2408,16 @@ if (isset($_GET['bl_id'])) {
                             <strong>Véhicule:</strong> <span id="printVehicle">-</span>
                         </div>
                         <div>
+                            <strong>Date de livraison:</strong> <span id="printDeliveryDate"><?php echo date('d/m/Y'); ?></span>
+                        </div>
+                        <div>
                             <strong>Conditions de remise:</strong> <span id="printConditions">Sur place</span>
                         </div>
                         <div>
-                            <strong>Date de livraison:</strong> <span id="printDeliveryDate"><?php echo date('d/m/Y'); ?></span>
+                            <strong>Total palettes:</strong> <span id="printTotalPalettes">0</span>
+                        </div>
+                        <div>
+                            <strong>Valeur totale:</strong> <span id="printTotalValue">0.00 DA</span>
                         </div>
                     </div>
                 </div>
@@ -2150,16 +2425,27 @@ if (isset($_GET['bl_id'])) {
                 <table class="print-items-table">
                     <thead>
                         <tr>
-                            <th width="40">N°</th>
-                            <th>Description</th>
-                            <th width="80">Unité</th>
-                            <th width="90">Qté livrée</th>
-                            <th width="120">Observations</th>
+                            <th width="30">N°</th>
+                            <th>Désignation</th>
+                            <th width="50">Unité</th>
+                            <th width="50">Qté</th>
+                            <th width="60">Prix U.</th>
+                            <th width="70">Total</th>
+                            <th width="50">Nb Pal</th>
                         </tr>
                     </thead>
                     <tbody id="printBLItems">
                         <!-- Les articles seront insérés ici -->
                     </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align: right; font-weight: 600; background: #f8f9fa;">Totaux:</td>
+                            <td style="font-weight: 600; background: #f8f9fa;" id="printBLTotalQty">0</td>
+                            <td style="background: #f8f9fa;"></td>
+                            <td style="font-weight: 600; background: #f8f9fa;" id="printBLTotalValue">0.00 DA</td>
+                            <td style="font-weight: 600; background: #f8f9fa;" id="printBLTotalPalettes">0</td>
+                        </tr>
+                    </tfoot>
                 </table>
 
                 <div class="print-terms">
@@ -2198,10 +2484,16 @@ if (isset($_GET['bl_id'])) {
                     <button class="btn btn-primary" id="doPrintBL">
                         <i class="fas fa-print"></i> Imprimer maintenant
                     </button>
+                    <button class="btn btn-info" style="margin-left: 10px;" onclick="downloadAsPDF('bl')">
+                        <i class="fas fa-download"></i> Télécharger PDF
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Pour l'impression directe sans modal -->
+    <div id="directPrintContent" style="display: none;"></div>
 
     <script>
         // Variables globales
@@ -2210,6 +2502,98 @@ if (isset($_GET['bl_id'])) {
         let invoiceItemCount = 0;
         let blItemCount = 0;
         let currentDocumentType = 'invoice';
+
+        // Fonctions pour convertir les nombres en lettres
+        function nombreEnLettres(nombre) {
+            const unites = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
+            const dizaines = ['', 'dix', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix'];
+            const exceptions = {
+                11: 'onze', 12: 'douze', 13: 'treize', 14: 'quatorze', 15: 'quinze',
+                16: 'seize', 17: 'dix-sept', 18: 'dix-huit', 19: 'dix-neuf'
+            };
+            
+            if (nombre === 0) return 'zéro';
+            
+            let texte = '';
+            
+            // Millions
+            const millions = Math.floor(nombre / 1000000);
+            if (millions > 0) {
+                texte += nombreEnLettres(millions) + ' million' + (millions > 1 ? 's' : '') + ' ';
+                nombre %= 1000000;
+            }
+            
+            // Milliers
+            const milliers = Math.floor(nombre / 1000);
+            if (milliers > 0) {
+                if (milliers === 1) {
+                    texte += 'mille ';
+                } else {
+                    texte += nombreEnLettres(milliers) + ' mille ';
+                }
+                nombre %= 1000;
+            }
+            
+            // Centaines
+            const centaines = Math.floor(nombre / 100);
+            if (centaines > 0) {
+                if (centaines === 1) {
+                    texte += 'cent ';
+                } else {
+                    texte += unites[centaines] + ' cent ';
+                }
+                nombre %= 100;
+            }
+            
+            // Dizaines et unités
+            if (nombre > 0) {
+                if (nombre < 10) {
+                    texte += unites[nombre] + ' ';
+                } else if (nombre < 20) {
+                    texte += exceptions[nombre] + ' ';
+                } else {
+                    const dizaine = Math.floor(nombre / 10);
+                    const unite = nombre % 10;
+                    
+                    if (dizaine === 7 || dizaine === 9) {
+                        const dizaineCorrigee = dizaine - 1;
+                        const uniteCorrigee = unite + 10;
+                        texte += dizaines[dizaineCorrigee];
+                        if (uniteCorrigee > 0) {
+                            texte += '-' + unites[uniteCorrigee];
+                        }
+                        texte += ' ';
+                    } else {
+                        texte += dizaines[dizaine];
+                        if (unite > 0) {
+                            if (dizaine === 8) {
+                                texte += (unite === 1) ? '-un' : '-' + unites[unite];
+                            } else {
+                                texte += (unite === 1) ? ' et un' : '-' + unites[unite];
+                            }
+                        }
+                        texte += ' ';
+                    }
+                }
+            }
+            
+            return texte.trim();
+        }
+
+        function montantEnLettres(montant) {
+            const entier = Math.floor(montant);
+            const decimal = Math.round((montant - entier) * 100);
+            
+            let texte = nombreEnLettres(entier) + ' dinar';
+            if (entier > 1) texte += 's';
+            
+            if (decimal > 0) {
+                texte += ' et ' + nombreEnLettres(decimal) + ' centime';
+                if (decimal > 1) texte += 's';
+            }
+            
+            return texte;
+        }
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', function() {
@@ -2247,16 +2631,102 @@ if (isset($_GET['bl_id'])) {
             <?php if ($preview_bl): ?>
             loadBLForPreview(<?php echo json_encode($preview_bl); ?>, <?php echo json_encode($preview_bl_items ?? []); ?>);
             <?php endif; ?>
+
+            // Setup search functionality
+            setupSearch();
         });
+
+        // Search functionality
+        function setupSearch() {
+            const searchInput = document.getElementById('globalSearch');
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                const rows = document.querySelectorAll('.document-row');
+                
+                if (searchTerm === '') {
+                    // Reset all rows
+                    rows.forEach(row => {
+                        row.style.display = '';
+                        removeHighlights(row);
+                    });
+                    return;
+                }
+                
+                rows.forEach(row => {
+                    removeHighlights(row);
+                    
+                    // Get text content from relevant cells
+                    const clientName = row.querySelector('.client-name').textContent.toLowerCase();
+                    const documentNumber = row.cells[1].textContent.toLowerCase();
+                    const documentType = row.cells[0].textContent.toLowerCase();
+                    
+                    // Check if search term matches
+                    const matches = clientName.includes(searchTerm) || 
+                                  documentNumber.includes(searchTerm) ||
+                                  documentType.includes(searchTerm);
+                    
+                    if (matches) {
+                        row.style.display = '';
+                        // Highlight matching text
+                        highlightText(row, searchTerm);
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        function highlightText(element, searchTerm) {
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            let node;
+            while (node = walker.nextNode()) {
+                const parent = node.parentNode;
+                if (parent.nodeName === 'SPAN' && parent.classList.contains('highlight')) {
+                    continue;
+                }
+                
+                const text = node.nodeValue;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                const newText = text.replace(regex, '<span class="highlight">$1</span>');
+                
+                if (newText !== text) {
+                    const newSpan = document.createElement('span');
+                    newSpan.innerHTML = newText;
+                    parent.replaceChild(newSpan, node);
+                }
+            }
+        }
+
+        function removeHighlights(element) {
+            const highlights = element.querySelectorAll('.highlight');
+            highlights.forEach(highlight => {
+                const parent = highlight.parentNode;
+                parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+                parent.normalize();
+            });
+        }
 
         // Load client data when selected (for invoice)
         function loadClientData() {
             const clientSelect = document.getElementById('client_id');
             const clientAddress = document.getElementById('client_address');
             const clientContact = document.getElementById('client_contact');
+            const clientNif = document.getElementById('client_nif');
+            const clientRc = document.getElementById('client_rc');
+            const clientArticleNumber = document.getElementById('client_article_number');
             const previewClientName = document.getElementById('previewClientName');
             const previewClientAddress = document.getElementById('previewClientAddress');
             const previewClientContact = document.getElementById('previewClientContact');
+            const previewClientNif = document.getElementById('previewClientNif');
+            const previewClientRc = document.getElementById('previewClientRc');
+            const previewClientArticleNumber = document.getElementById('previewClientArticleNumber');
             
             clientSelect.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
@@ -2396,24 +2866,45 @@ if (isset($_GET['bl_id'])) {
                 const itemRow = document.getElementById(itemId);
                 
                 if (itemRow) {
-                    const descMatch = item.description.match(/^(.*?)\s*\((.*?)\)$/);
-                    if (descMatch) {
-                        itemRow.querySelector('.bl-item-desc').value = descMatch[1].trim();
-                        itemRow.querySelector('.bl-item-unit').value = descMatch[2].trim();
-                    } else {
-                        itemRow.querySelector('.bl-item-desc').value = item.description;
-                        itemRow.querySelector('.bl-item-unit').value = 'unité';
+                    // Parse description for palettes
+                    const desc = item.description || '';
+                    
+                    // Extract Palettes
+                    const palMatch = desc.match(/Palettes:\s*([^|]+)/);
+                    if (palMatch) {
+                        itemRow.querySelector('.bl-item-palettes').value = palMatch[1].trim();
                     }
+                    
+                    // Extract basic description (before first parenthesis or pipe)
+                    const baseDescMatch = desc.match(/^([^(|]+)/);
+                    if (baseDescMatch) {
+                        itemRow.querySelector('.bl-item-desc').value = baseDescMatch[1].trim();
+                    }
+                    
+                    // Unit (inside parentheses)
+                    const unitMatch = desc.match(/\(([^)]+)\)/);
+                    if (unitMatch) {
+                        itemRow.querySelector('.bl-item-unit').value = unitMatch[1].trim();
+                    }
+                    
                     itemRow.querySelector('.bl-item-qty').value = item.quantity;
+                    itemRow.querySelector('.bl-item-price').value = item.price || 0;
                     
                     // Update item object
                     const itemObj = blItems.find(i => i.id === itemId);
                     if (itemObj) {
                         itemObj.description = item.description;
                         itemObj.quantity = item.quantity;
+                        itemObj.price = item.price || 0;
+                        itemObj.palettes = palMatch ? palMatch[1].trim() : '0';
+                        
+                        calculateBLItemTotal(itemId);
                     }
                 }
             });
+            
+            // Calculate totals
+            calculateBL();
             
             // Update preview
             updateBLPreview();
@@ -2455,7 +2946,8 @@ if (isset($_GET['bl_id'])) {
                 unit: 'unité',
                 quantity: 1,
                 price: 0,
-                total: 0
+                tvaRate: 19,
+                totalTTC: 0
             };
             
             invoiceItems.push(newItem);
@@ -2486,7 +2978,11 @@ if (isset($_GET['bl_id'])) {
                     <input type="number" name="item_price[]" class="item-price form-control" 
                            min="0" step="0.01" value="0" placeholder="0.00">
                 </td>
-                <td class="item-total">0.00 DA</td>
+                <td class="tva-column">
+                    <input type="number" name="item_tva_rate[]" class="item-tva-rate form-control" 
+                           min="0" max="100" step="0.1" value="19" placeholder="19">
+                </td>
+                <td class="item-total-ttc">0.00 DA</td>
                 <td><button type="button" class="btn-icon remove-item"><i class="fas fa-trash"></i></button></td>
             `;
             
@@ -2508,6 +3004,7 @@ if (isset($_GET['bl_id'])) {
             const unitSelect = itemRow.querySelector('.item-unit');
             const qtyInput = itemRow.querySelector('.item-qty');
             const priceInput = itemRow.querySelector('.item-price');
+            const tvaRateInput = itemRow.querySelector('.item-tva-rate');
             const removeBtn = itemRow.querySelector('.remove-item');
             
             descInput.addEventListener('input', function() {
@@ -2532,6 +3029,12 @@ if (isset($_GET['bl_id'])) {
                 calculateInvoice();
             });
             
+            tvaRateInput.addEventListener('input', function() {
+                updateInvoiceItem(itemId, 'tvaRate', parseFloat(this.value) || 0);
+                calculateInvoiceItemTotal(itemId);
+                calculateInvoice();
+            });
+            
             removeBtn.addEventListener('click', function() {
                 removeInvoiceItem(itemId);
             });
@@ -2547,9 +3050,12 @@ if (isset($_GET['bl_id'])) {
         function calculateInvoiceItemTotal(id) {
             const item = invoiceItems.find(item => item.id === id);
             if (item) {
-                item.total = item.quantity * item.price;
-                const totalCell = document.querySelector(`#${id} .item-total`);
-                totalCell.textContent = formatCurrency(item.total);
+                const subtotal = item.quantity * item.price;
+                const tvaAmount = subtotal * (item.tvaRate / 100);
+                item.totalTTC = subtotal + tvaAmount;
+                
+                const totalTtcCell = document.querySelector(`#${id} .item-total-ttc`);
+                totalTtcCell.textContent = formatCurrency(item.totalTTC);
             }
         }
 
@@ -2572,39 +3078,79 @@ if (isset($_GET['bl_id'])) {
 
         function calculateInvoice() {
             let subtotal = 0;
+            let totalTVA = 0;
+            let totalTTC = 0;
             
-            // Calculer le sous-total
+            // Calculer les totaux
             invoiceItems.forEach(item => {
-                subtotal += item.total;
+                const itemSubtotal = item.quantity * item.price;
+                const itemTVA = itemSubtotal * (item.tvaRate / 100);
+                const itemTotal = itemSubtotal + itemTVA;
+                
+                subtotal += itemSubtotal;
+                totalTVA += itemTVA;
+                totalTTC += itemTotal;
             });
             
+            // Update invoice totals
             document.getElementById('subtotal').textContent = formatCurrency(subtotal);
             document.getElementById('previewSubtotal').textContent = formatCurrency(subtotal);
             
-            // Calculer la TVA
+            // Calculer la TVA globale
             const tvaRate = parseFloat(document.getElementById('tva_rate').value) || 0;
-            const tvaAmount = subtotal * (tvaRate / 100);
-            const total = subtotal + tvaAmount;
-            
             document.getElementById('tvaPercent').textContent = tvaRate;
-            document.getElementById('tvaAmount').textContent = formatCurrency(tvaAmount);
-            document.getElementById('totalAmount').textContent = formatCurrency(total);
+            document.getElementById('previewTvaPercent').textContent = tvaRate;
             
-            document.getElementById('previewTvaAmount').textContent = formatCurrency(tvaAmount);
-            document.getElementById('previewTotalAmount').textContent = formatCurrency(total);
+            document.getElementById('tvaAmount').textContent = formatCurrency(totalTVA);
+            document.getElementById('totalAmount').textContent = formatCurrency(totalTTC);
+            
+            document.getElementById('previewTvaAmount').textContent = formatCurrency(totalTVA);
+            document.getElementById('previewTotalAmount').textContent = formatCurrency(totalTTC);
             
             // Update hidden inputs for form submission
             document.getElementById('subtotal_input').value = subtotal;
-            document.getElementById('tva_amount_input').value = tvaAmount;
-            document.getElementById('total_input').value = total;
+            document.getElementById('tva_amount_input').value = totalTVA;
+            document.getElementById('total_input').value = totalTTC;
+            
+            // Update amount in letters
+            updateAmountInLetters(totalTTC);
             
             // Mettre à jour l'aperçu
             updateInvoicePreview();
             
-            return { subtotal, tvaAmount, total };
+            return { subtotal, totalTVA, totalTTC };
+        }
+
+        function updateAmountInLetters(amount) {
+            const amountInLetters = montantEnLettres(amount);
+            const previewElement = document.getElementById('previewAmountInLetters');
+            if (previewElement) {
+                previewElement.innerHTML = `Arrêtée la présente facture à la somme de : <strong>${amountInLetters}</strong>`;
+            }
         }
 
         function updateInvoicePreview() {
+            // Update company info in preview
+            const companyNif = document.getElementById('company_nif').value;
+            const companyRc = document.getElementById('company_rc').value;
+            const companyArticleNumber = document.getElementById('company_article_number').value;
+            
+            document.getElementById('previewCompanyNif').textContent = companyNif;
+            document.getElementById('previewCompanyNif2').textContent = companyNif;
+            document.getElementById('previewCompanyRc').textContent = companyRc;
+            document.getElementById('previewCompanyRc2').textContent = companyRc;
+            document.getElementById('previewCompanyArticleNumber').textContent = companyArticleNumber;
+            document.getElementById('previewCompanyArticleNumber2').textContent = companyArticleNumber;
+            
+            // Update client info in preview
+            const clientNif = document.getElementById('client_nif').value;
+            const clientRc = document.getElementById('client_rc').value;
+            const clientArticleNumber = document.getElementById('client_article_number').value;
+            
+            document.getElementById('previewClientNif').textContent = clientNif || '-';
+            document.getElementById('previewClientRc').textContent = clientRc || '-';
+            document.getElementById('previewClientArticleNumber').textContent = clientArticleNumber || '-';
+            
             // Update items preview
             const previewItemsContainer = document.getElementById('previewInvoiceItems');
             previewItemsContainer.innerHTML = '';
@@ -2612,13 +3158,17 @@ if (isset($_GET['bl_id'])) {
             if (invoiceItems.length === 0) {
                 previewItemsContainer.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 20px; color: #999;">
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
                             Aucun article ajouté
                         </td>
                     </tr>
                 `;
             } else {
                 invoiceItems.forEach((item, index) => {
+                    const itemSubtotal = item.quantity * item.price;
+                    const itemTVA = itemSubtotal * (item.tvaRate / 100);
+                    const itemTotal = itemSubtotal + itemTVA;
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${index + 1}</td>
@@ -2626,7 +3176,8 @@ if (isset($_GET['bl_id'])) {
                         <td>${item.unit || 'unité'}</td>
                         <td>${formatNumber(item.quantity)}</td>
                         <td>${formatCurrency(item.price)}</td>
-                        <td>${formatCurrency(item.total)}</td>
+                        <td>${item.tvaRate}%</td>
+                        <td>${formatCurrency(itemTotal)}</td>
                     `;
                     previewItemsContainer.appendChild(row);
                 });
@@ -2654,7 +3205,10 @@ if (isset($_GET['bl_id'])) {
                 id: itemId,
                 description: '',
                 unit: 'unité',
-                quantity: 1
+                quantity: 1,
+                price: 0,
+                palettes: 0,
+                total: 0
             };
             
             blItems.push(newItem);
@@ -2665,7 +3219,7 @@ if (isset($_GET['bl_id'])) {
                 <td>${blItemCount}</td>
                 <td>
                     <input type="text" name="bl_item_description[]" class="bl-item-desc form-control" 
-                           placeholder="Description de l'article">
+                           placeholder="Désignation de l'article">
                 </td>
                 <td class="unit-column">
                     <select name="bl_item_unit[]" class="bl-item-unit form-control">
@@ -2675,11 +3229,21 @@ if (isset($_GET['bl_id'])) {
                         <option value="kg">kg</option>
                         <option value="rouleau">rouleau</option>
                         <option value="carton">carton</option>
+                        <option value="palette">palette</option>
                     </select>
                 </td>
                 <td>
                     <input type="number" name="bl_item_quantity[]" class="bl-item-qty form-control" 
                            min="1" step="1" value="1" placeholder="1">
+                </td>
+                <td class="bl-price-col">
+                    <input type="number" name="bl_item_price[]" class="bl-item-price form-control" 
+                           min="0" step="0.01" value="0" placeholder="0.00">
+                </td>
+                <td class="bl-total-col bl-item-total">0.00 DA</td>
+                <td class="bl-palettes-col">
+                    <input type="number" name="bl_item_palettes[]" class="bl-item-palettes form-control" 
+                           min="0" step="1" value="0" placeholder="0">
                 </td>
                 <td><button type="button" class="btn-icon remove-bl-item"><i class="fas fa-trash"></i></button></td>
             `;
@@ -2688,6 +3252,9 @@ if (isset($_GET['bl_id'])) {
             
             // Ajouter les écouteurs d'événements pour cet article
             addBLItemEventListeners(itemId);
+            
+            // Calculer le total pour cet article
+            calculateBLItemTotal(itemId);
             
             // Mettre à jour l'aperçu
             updateBLPreview();
@@ -2698,6 +3265,8 @@ if (isset($_GET['bl_id'])) {
             const descInput = itemRow.querySelector('.bl-item-desc');
             const unitSelect = itemRow.querySelector('.bl-item-unit');
             const qtyInput = itemRow.querySelector('.bl-item-qty');
+            const priceInput = itemRow.querySelector('.bl-item-price');
+            const palettesInput = itemRow.querySelector('.bl-item-palettes');
             const removeBtn = itemRow.querySelector('.remove-bl-item');
             
             descInput.addEventListener('input', function() {
@@ -2712,7 +3281,19 @@ if (isset($_GET['bl_id'])) {
             
             qtyInput.addEventListener('input', function() {
                 updateBLItem(itemId, 'quantity', parseInt(this.value) || 1);
-                updateBLPreview();
+                calculateBLItemTotal(itemId);
+                calculateBL();
+            });
+            
+            priceInput.addEventListener('input', function() {
+                updateBLItem(itemId, 'price', parseFloat(this.value) || 0);
+                calculateBLItemTotal(itemId);
+                calculateBL();
+            });
+            
+            palettesInput.addEventListener('input', function() {
+                updateBLItem(itemId, 'palettes', parseInt(this.value) || 0);
+                calculateBL();
             });
             
             removeBtn.addEventListener('click', function() {
@@ -2724,6 +3305,16 @@ if (isset($_GET['bl_id'])) {
             const item = blItems.find(item => item.id === id);
             if (item) {
                 item[field] = value;
+            }
+        }
+
+        function calculateBLItemTotal(id) {
+            const item = blItems.find(item => item.id === id);
+            if (item) {
+                item.total = item.quantity * item.price;
+                
+                const totalCell = document.querySelector(`#${id} .bl-item-total`);
+                totalCell.textContent = formatCurrency(item.total);
             }
         }
 
@@ -2740,7 +3331,33 @@ if (isset($_GET['bl_id'])) {
                 row.cells[0].textContent = index + 1;
             });
             
+            calculateBL();
             updateBLPreview();
+        }
+
+        function calculateBL() {
+            let totalQty = 0;
+            let totalValue = 0;
+            let totalPalettes = 0;
+            
+            // Calculer les totaux
+            blItems.forEach(item => {
+                totalQty += (item.quantity || 0);
+                totalValue += (item.total || 0);
+                totalPalettes += parseInt(item.palettes || 0);
+            });
+            
+            // Update BL totals
+            document.getElementById('blTotalQty').textContent = totalQty;
+            document.getElementById('blTotalValue').textContent = formatCurrency(totalValue);
+            document.getElementById('blTotalPalettes').textContent = totalPalettes;
+            
+            // Update preview totals
+            document.getElementById('previewBLTotalQty').textContent = totalQty;
+            document.getElementById('previewBLTotalValue').textContent = formatCurrency(totalValue);
+            document.getElementById('previewBLTotalPalettes').textContent = totalPalettes;
+            
+            return { totalQty, totalValue, totalPalettes };
         }
 
         function updateBLPreview() {
@@ -2751,7 +3368,7 @@ if (isset($_GET['bl_id'])) {
             if (blItems.length === 0) {
                 previewItemsContainer.innerHTML = `
                     <tr>
-                        <td colspan="5" style="text-align: center; padding: 20px; color: #999;">
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
                             Aucun article ajouté
                         </td>
                     </tr>
@@ -2764,11 +3381,16 @@ if (isset($_GET['bl_id'])) {
                         <td>${item.description || 'Article'}</td>
                         <td>${item.unit || 'unité'}</td>
                         <td>${formatNumber(item.quantity)}</td>
-                        <td></td>
+                        <td>${formatCurrency(item.price)}</td>
+                        <td>${formatCurrency(item.total)}</td>
+                        <td>${item.palettes || 0}</td>
                     `;
                     previewItemsContainer.appendChild(row);
                 });
             }
+            
+            // Calculate and update totals
+            const totals = calculateBL();
             
             // Update other preview fields
             const deliveryPerson = document.getElementById('delivery_person').value;
@@ -2799,6 +3421,15 @@ if (isset($_GET['bl_id'])) {
             
             document.getElementById('tva_rate').addEventListener('input', calculateInvoice);
             
+            // Update client NIF, RC, Article Number when changed
+            document.getElementById('client_nif').addEventListener('input', updateInvoicePreview);
+            document.getElementById('client_rc').addEventListener('input', updateInvoicePreview);
+            document.getElementById('client_article_number').addEventListener('input', updateInvoicePreview);
+            
+            document.getElementById('company_nif').addEventListener('input', updateInvoicePreview);
+            document.getElementById('company_rc').addEventListener('input', updateInvoicePreview);
+            document.getElementById('company_article_number').addEventListener('input', updateInvoicePreview);
+            
             document.getElementById('client_id').addEventListener('change', updateInvoicePreview);
             document.getElementById('invoice_date').addEventListener('input', updateInvoicePreview);
             document.getElementById('due_date').addEventListener('input', updateInvoicePreview);
@@ -2809,8 +3440,10 @@ if (isset($_GET['bl_id'])) {
             // --- BL ---
             document.getElementById('addBLItem').addEventListener('click', function() {
                 addNewBLItem();
-                updateBLPreview();
+                calculateBL();
             });
+            
+            document.getElementById('calculateBL').addEventListener('click', calculateBL);
             
             document.getElementById('bl_client_id').addEventListener('change', updateBLPreview);
             document.getElementById('bl_date').addEventListener('input', updateBLPreview);
@@ -2845,12 +3478,12 @@ if (isset($_GET['bl_id'])) {
                     return;
                 }
                 
-                fillPrintData('invoice');
-                document.getElementById('printInvoiceModal').classList.add('active');
+                printDocument('invoice');
             });
             
             // Prévisualiser le BL
             document.getElementById('previewBL').addEventListener('click', function() {
+                const result = calculateBL();
                 if (blItems.length === 0) {
                     alert('Veuillez ajouter au moins un article au BL.');
                     return;
@@ -2862,13 +3495,13 @@ if (isset($_GET['bl_id'])) {
             
             // Imprimer le BL
             document.getElementById('printBL').addEventListener('click', function() {
+                const result = calculateBL();
                 if (blItems.length === 0) {
                     alert('Veuillez ajouter au moins un article au BL.');
                     return;
                 }
                 
-                fillPrintData('bl');
-                document.getElementById('printBLModal').classList.add('active');
+                printDocument('bl');
             });
             
             // Actualiser la liste
@@ -2887,12 +3520,408 @@ if (isset($_GET['bl_id'])) {
             
             // Imprimer depuis les modals
             document.getElementById('doPrintInvoice').addEventListener('click', function() {
-                window.print();
+                printFromModal('invoice');
             });
             
             document.getElementById('doPrintBL').addEventListener('click', function() {
-                window.print();
+                printFromModal('bl');
             });
+        }
+
+        // Fonction d'impression directe
+        function printDocument(type) {
+            if (type === 'invoice') {
+                const result = calculateInvoice();
+                if (invoiceItems.length === 0) {
+                    alert('Veuillez ajouter au moins un article à la facture.');
+                    return;
+                }
+                
+                const printContent = generatePrintContent(type);
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Imprimer Facture</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            .invoice-header { text-align: center; margin-bottom: 30px; }
+                            .invoice-header h2 { color: #2c3e50; }
+                            .company-info, .client-info { 
+                                border: 1px solid #ddd; 
+                                padding: 15px; 
+                                margin-bottom: 20px; 
+                                border-radius: 5px;
+                            }
+                            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                            th { background: #2c3e50; color: white; padding: 10px; text-align: left; }
+                            td { padding: 8px; border-bottom: 1px solid #ddd; }
+                            .total-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+                            .grand-total { font-weight: bold; font-size: 1.1em; border-top: 2px solid #333; padding-top: 10px; }
+                            .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+                            .signature-box { text-align: center; }
+                            .signature-line { width: 200px; height: 1px; background: #333; margin: 40px auto 10px; }
+                            @media print {
+                                @page { margin: 20mm; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${printContent}
+                        <div class="no-print" style="text-align: center; margin-top: 20px;">
+                            <button onclick="window.print()" style="padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Imprimer
+                            </button>
+                            <button onclick="window.close()" style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                                Fermer
+                            </button>
+                        </div>
+                        <script>
+                            // Auto-print after loading
+                            window.onload = function() {
+                                setTimeout(function() {
+                                    window.print();
+                                }, 500);
+                            };
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                
+            } else if (type === 'bl') {
+                const result = calculateBL();
+                if (blItems.length === 0) {
+                    alert('Veuillez ajouter au moins un article au BL.');
+                    return;
+                }
+                
+                const printContent = generatePrintContent(type);
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Imprimer BL</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            .bl-header { text-align: center; margin-bottom: 30px; }
+                            .bl-header h2 { color: #2ecc71; }
+                            .company-info, .client-info { 
+                                border: 1px solid #ddd; 
+                                padding: 15px; 
+                                margin-bottom: 20px; 
+                                border-radius: 5px;
+                            }
+                            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                            th { background: #2ecc71; color: white; padding: 10px; text-align: left; }
+                            td { padding: 8px; border-bottom: 1px solid #ddd; }
+                            .total-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+                            .grand-total { font-weight: bold; font-size: 1.1em; border-top: 2px solid #333; padding-top: 10px; }
+                            .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+                            .signature-box { text-align: center; }
+                            .signature-line { width: 200px; height: 1px; background: #333; margin: 40px auto 10px; }
+                            @media print {
+                                @page { margin: 20mm; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${printContent}
+                        <div class="no-print" style="text-align: center; margin-top: 20px;">
+                            <button onclick="window.print()" style="padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                                Imprimer
+                            </button>
+                            <button onclick="window.close()" style="padding: 10px 20px; background: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                                Fermer
+                            </button>
+                        </div>
+                        <script>
+                            // Auto-print after loading
+                            window.onload = function() {
+                                setTimeout(function() {
+                                    window.print();
+                                }, 500);
+                            };
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+            }
+        }
+
+        // Fonction pour générer le contenu d'impression
+        function generatePrintContent(type) {
+            if (type === 'invoice') {
+                const result = calculateInvoice();
+                const clientSelect = document.getElementById('client_id');
+                const selectedOption = clientSelect.options[clientSelect.selectedIndex];
+                const clientName = selectedOption?.text || '-';
+                const address = selectedOption?.getAttribute('data-address') || '-';
+                const phone = selectedOption?.getAttribute('data-phone') || '';
+                const email = selectedOption?.getAttribute('data-email') || '';
+                
+                // Informations de l'entreprise
+                const companyNif = document.getElementById('company_nif').value;
+                const companyRc = document.getElementById('company_rc').value;
+                const companyArticleNumber = document.getElementById('company_article_number').value;
+                
+                // Informations du client
+                const clientNif = document.getElementById('client_nif').value;
+                const clientRc = document.getElementById('client_rc').value;
+                const clientArticleNumber = document.getElementById('client_article_number').value;
+                
+                let itemsHtml = '';
+                invoiceItems.forEach((item, index) => {
+                    const itemSubtotal = item.quantity * item.price;
+                    const itemTVA = itemSubtotal * (item.tvaRate / 100);
+                    const itemTotal = itemSubtotal + itemTVA;
+                    
+                    itemsHtml += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${item.description || 'Article'}</td>
+                            <td>${item.unit || 'unité'}</td>
+                            <td>${formatNumber(item.quantity)}</td>
+                            <td>${formatCurrency(item.price)}</td>
+                            <td>${item.tvaRate}%</td>
+                            <td>${formatCurrency(itemTotal)}</td>
+                        </tr>
+                    `;
+                });
+                
+                const amountInLetters = montantEnLettres(result.totalTTC);
+                
+                return `
+                    <div class="invoice-header">
+                        <h1>FACTURE</h1>
+                        <p><strong>IMPRIMERIE PRO</strong></p>
+                        <p>123 Rue d'Impression, Setif Centre, Algérie</p>
+                        <p>Tél: 0660639631 | Email: Rymemballagemoderne@gmail.com</p>
+                        <p>NIF: ${companyNif} | RC: ${companyRc} | N° Article: ${companyArticleNumber}</p>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div>
+                            <p><strong>N° Facture:</strong> ${document.getElementById('invoice_number').value}</p>
+                            <p><strong>Date:</strong> ${formatDate(document.getElementById('invoice_date').value)}</p>
+                            <p><strong>Échéance:</strong> ${formatDate(document.getElementById('due_date').value)}</p>
+                        </div>
+                        <div>
+                            <p><strong>Conditions paiement:</strong> ${document.getElementById('payment_terms').value}</p>
+                            <p><strong>Conditions livraison:</strong> ${document.getElementById('delivery_terms').value}</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div class="company-info" style="flex: 1; margin-right: 10px;">
+                            <h3>Émise par:</h3>
+                            <p><strong>IMPRIMERIE PRO</strong></p>
+                            <p>123 Rue d'Impression</p>
+                            <p>Setif Centre, Algérie</p>
+                            <p>Tél: 0660639631</p>
+                            <p>Email: Rymemballagemoderne@gmail.com</p>
+                        </div>
+                        <div class="client-info" style="flex: 1; margin-left: 10px;">
+                            <h3>Facturé à:</h3>
+                            <p><strong>${clientName}</strong></p>
+                            <p>${address}</p>
+                            <p>${phone + (email ? ' | ' + email : '')}</p>
+                            <p>NIF: ${clientNif || '-'}</p>
+                            <p>RC: ${clientRc || '-'}</p>
+                            <p>N° Article: ${clientArticleNumber || '-'}</p>
+                        </div>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>N°</th>
+                                <th>Description</th>
+                                <th>Unité</th>
+                                <th>Qté</th>
+                                <th>Prix U.</th>
+                                <th>TVA %</th>
+                                <th>Total TTC</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                    </table>
+                    
+                    <div style="float: right; width: 300px;">
+                        <div class="total-row">
+                            <span>Sous-total HT:</span>
+                            <span>${formatCurrency(result.subtotal)}</span>
+                        </div>
+                        <div class="total-row">
+                            <span>TVA (${document.getElementById('tva_rate').value}%):</span>
+                            <span>${formatCurrency(result.totalTVA)}</span>
+                        </div>
+                        <div class="total-row grand-total">
+                            <span>Total à payer TTC:</span>
+                            <span>${formatCurrency(result.totalTTC)}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="clear: both; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                        <p><strong>Montant en lettres:</strong> ${amountInLetters}</p>
+                    </div>
+                    
+                    <div style="margin-top: 30px;">
+                        <p><strong>Notes:</strong> ${document.getElementById('notes').value || '-'}</p>
+                        <p style="font-style: italic;">
+                            Paiement par virement bancaire à l'IBAN: DZ 1234 5678 9012 3456 7890 1234
+                        </p>
+                    </div>
+                    
+                    <div class="signatures">
+                        <div class="signature-box">
+                            <p>Le Responsable</p>
+                            <div class="signature-line"></div>
+                            <p>Signature & cachet</p>
+                        </div>
+                        <div class="signature-box">
+                            <p>Le Client</p>
+                            <div class="signature-line"></div>
+                            <p>Signature & cachet</p>
+                        </div>
+                    </div>
+                `;
+                
+            } else if (type === 'bl') {
+                const result = calculateBL();
+                const clientSelect = document.getElementById('bl_client_id');
+                const selectedOption = clientSelect.options[clientSelect.selectedIndex];
+                const clientName = selectedOption?.text || '-';
+                const address = selectedOption?.getAttribute('data-address') || '-';
+                const phone = selectedOption?.getAttribute('data-phone') || '';
+                const email = selectedOption?.getAttribute('data-email') || '';
+                
+                let itemsHtml = '';
+                blItems.forEach((item, index) => {
+                    itemsHtml += `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${item.description || 'Article'}</td>
+                            <td>${item.unit || 'unité'}</td>
+                            <td>${formatNumber(item.quantity)}</td>
+                            <td>${formatCurrency(item.price)}</td>
+                            <td>${formatCurrency(item.total)}</td>
+                            <td>${item.palettes || 0}</td>
+                        </tr>
+                    `;
+                });
+                
+                return `
+                    <div class="bl-header">
+                        <h1>BON DE LIVRAISON</h1>
+                        <p><strong>IMPRIMERIE PRO</strong></p>
+                        <p>123 Rue d'Impression, Alger Centre, Algérie</p>
+                        <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
+                        <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div>
+                            <p><strong>N° BL:</strong> ${document.getElementById('bl_number').value}</p>
+                            <p><strong>Date:</strong> ${formatDate(document.getElementById('bl_date').value)}</p>
+                            <p><strong>Référence:</strong> ${document.getElementById('reference').value || '-'}</p>
+                        </div>
+                        <div>
+                            <p><strong>Livreur:</strong> ${document.getElementById('delivery_person').value || '-'}</p>
+                            <p><strong>Véhicule:</strong> ${document.getElementById('vehicle').value || '-'}</p>
+                            <p><strong>Conditions:</strong> ${document.getElementById('conditions').value}</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <div class="company-info" style="flex: 1; margin-right: 10px;">
+                            <h3>Expéditeur:</h3>
+                            <p><strong>IMPRIMERIE PRO</strong></p>
+                            <p>123 Rue d'Impression</p>
+                            <p>Alger Centre, Algérie</p>
+                            <p>Tél: 021 23 45 67</p>
+                        </div>
+                        <div class="client-info" style="flex: 1; margin-left: 10px;">
+                            <h3>Destinataire:</h3>
+                            <p><strong>${clientName}</strong></p>
+                            <p>${address}</p>
+                            <p>${phone + (email ? ' | ' + email : '')}</p>
+                        </div>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>N°</th>
+                                <th>Désignation</th>
+                                <th>Unité</th>
+                                <th>Qté</th>
+                                <th>Prix U.</th>
+                                <th>Total</th>
+                                <th>Nb Pal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: bold;">Totaux:</td>
+                                <td style="font-weight: bold;">${result.totalQty}</td>
+                                <td></td>
+                                <td style="font-weight: bold;">${formatCurrency(result.totalValue)}</td>
+                                <td style="font-weight: bold;">${result.totalPalettes}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+                        <p><strong>Observations:</strong> ${document.getElementById('bl_notes').value || '-'}</p>
+                    </div>
+                    
+                    <div class="signatures">
+                        <div class="signature-box">
+                            <p><strong>Le Livreur</strong></p>
+                            <div class="signature-line"></div>
+                            <p>Nom: _______________________</p>
+                            <p>Signature:</p>
+                        </div>
+                        <div class="signature-box">
+                            <p><strong>Le Client</strong></p>
+                            <div class="signature-line"></div>
+                            <p>Nom: _______________________</p>
+                            <p>Signature:</p>
+                            <p>Cachet:</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 30px; text-align: center; font-size: 0.9em; color: #666;">
+                        <p>Document établi en double exemplaire - Un exemplaire pour le client, un pour l'expéditeur</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Fonction pour imprimer depuis le modal
+        function printFromModal(type) {
+            window.print();
+        }
+
+        // Fonction pour télécharger en PDF (simulée)
+        function downloadAsPDF(type) {
+            alert('La fonction de téléchargement PDF sera implémentée avec une bibliothèque comme jsPDF.');
+            // Pour une implémentation réelle, vous aurez besoin de jsPDF:
+            // const { jsPDF } = window.jspdf;
+            // const doc = new jsPDF();
+            // doc.text("Votre document PDF", 10, 10);
+            // doc.save(`${type}_${new Date().getTime()}.pdf`);
         }
 
         // Remplir les données dans le modal d'impression
@@ -2906,6 +3935,16 @@ if (isset($_GET['bl_id'])) {
                 const phone = selectedOption?.getAttribute('data-phone') || '';
                 const email = selectedOption?.getAttribute('data-email') || '';
                 
+                // Informations de l'entreprise
+                const companyNif = document.getElementById('company_nif').value;
+                const companyRc = document.getElementById('company_rc').value;
+                const companyArticleNumber = document.getElementById('company_article_number').value;
+                
+                // Informations du client
+                const clientNif = document.getElementById('client_nif').value;
+                const clientRc = document.getElementById('client_rc').value;
+                const clientArticleNumber = document.getElementById('client_article_number').value;
+                
                 // Informations de base
                 document.getElementById('printInvoiceNumber').textContent = 
                     document.getElementById('invoice_number').value;
@@ -2918,16 +3957,31 @@ if (isset($_GET['bl_id'])) {
                 document.getElementById('printDeliveryTerms').textContent = 
                     document.getElementById('delivery_terms').value;
                 
+                // Informations de l'entreprise
+                document.getElementById('printCompanyNif').textContent = companyNif;
+                document.getElementById('printCompanyNif2').textContent = companyNif;
+                document.getElementById('printCompanyRc').textContent = companyRc;
+                document.getElementById('printCompanyRc2').textContent = companyRc;
+                document.getElementById('printCompanyArticleNumber').textContent = companyArticleNumber;
+                document.getElementById('printCompanyArticleNumber2').textContent = companyArticleNumber;
+                
                 // Informations du client
                 document.getElementById('printClientName').textContent = clientName;
                 document.getElementById('printClientAddress').textContent = address;
                 document.getElementById('printClientContact').textContent = phone + (email ? ' | ' + email : '');
+                document.getElementById('printClientNif').textContent = clientNif || '-';
+                document.getElementById('printClientRc').textContent = clientRc || '-';
+                document.getElementById('printClientArticleNumber').textContent = clientArticleNumber || '-';
                 
                 // Articles
                 const printItemsContainer = document.getElementById('printInvoiceItems');
                 printItemsContainer.innerHTML = '';
                 
                 invoiceItems.forEach((item, index) => {
+                    const itemSubtotal = item.quantity * item.price;
+                    const itemTVA = itemSubtotal * (item.tvaRate / 100);
+                    const itemTotal = itemSubtotal + itemTVA;
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${index + 1}</td>
@@ -2935,7 +3989,8 @@ if (isset($_GET['bl_id'])) {
                         <td>${item.unit || 'unité'}</td>
                         <td>${formatNumber(item.quantity)}</td>
                         <td>${formatCurrency(item.price)}</td>
-                        <td>${formatCurrency(item.total)}</td>
+                        <td>${item.tvaRate}%</td>
+                        <td>${formatCurrency(itemTotal)}</td>
                     `;
                     printItemsContainer.appendChild(row);
                 });
@@ -2943,14 +3998,20 @@ if (isset($_GET['bl_id'])) {
                 // Totaux
                 document.getElementById('printSubtotal').textContent = formatCurrency(result.subtotal);
                 document.getElementById('printTvaPercent').textContent = document.getElementById('tva_rate').value;
-                document.getElementById('printTvaAmount').textContent = formatCurrency(result.tvaAmount);
-                document.getElementById('printTotalAmount').textContent = formatCurrency(result.total);
+                document.getElementById('printTvaAmount').textContent = formatCurrency(result.totalTVA);
+                document.getElementById('printTotalAmount').textContent = formatCurrency(result.totalTTC);
+                
+                // Montant en lettres
+                const amountInLetters = montantEnLettres(result.totalTTC);
+                document.getElementById('printAmountInLetters').innerHTML = 
+                    `Arrêtée la présente facture à la somme de : <strong>${amountInLetters}</strong>`;
                 
                 // Notes
                 const notes = document.getElementById('notes').value;
                 document.getElementById('printNotes').textContent = notes || '-';
                 
             } else if (type === 'bl') {
+                const result = calculateBL();
                 const clientSelect = document.getElementById('bl_client_id');
                 const selectedOption = clientSelect.options[clientSelect.selectedIndex];
                 const clientName = selectedOption?.text || '-';
@@ -2973,6 +4034,8 @@ if (isset($_GET['bl_id'])) {
                     document.getElementById('vehicle').value || '-';
                 document.getElementById('printConditions').textContent = 
                     document.getElementById('conditions').value;
+                document.getElementById('printTotalPalettes').textContent = result.totalPalettes;
+                document.getElementById('printTotalValue').textContent = formatCurrency(result.totalValue);
                 
                 // Informations du client
                 document.getElementById('printBLClientName').textContent = clientName;
@@ -2990,10 +4053,17 @@ if (isset($_GET['bl_id'])) {
                         <td>${item.description || 'Article'}</td>
                         <td>${item.unit || 'unité'}</td>
                         <td>${formatNumber(item.quantity)}</td>
-                        <td></td>
+                        <td>${formatCurrency(item.price)}</td>
+                        <td>${formatCurrency(item.total)}</td>
+                        <td>${item.palettes || 0}</td>
                     `;
                     printItemsContainer.appendChild(row);
                 });
+                
+                // Totaux
+                document.getElementById('printBLTotalQty').textContent = result.totalQty;
+                document.getElementById('printBLTotalValue').textContent = formatCurrency(result.totalValue);
+                document.getElementById('printBLTotalPalettes').textContent = result.totalPalettes;
                 
                 // Notes
                 const notes = document.getElementById('bl_notes').value;
@@ -3029,19 +4099,21 @@ if (isset($_GET['bl_id'])) {
 
         // Functions for printing existing documents
         window.printExistingInvoice = function(invoiceId) {
-            window.open(`print_invoice.php?id=${invoiceId}`, '_blank');
+            // Pour l'instant, rediriger vers la page avec l'ID
+            window.location.href = `facture.php?invoice_id=${invoiceId}`;
         };
 
         window.viewInvoice = function(invoiceId) {
-            window.location.href = `facturation.php?invoice_id=${invoiceId}`;
+            window.location.href = `facture.php?invoice_id=${invoiceId}`;
         };
 
         window.printExistingBL = function(orderId) {
-            window.open(`print_bl.php?id=${orderId}`, '_blank');
+            // Pour l'instant, rediriger vers la page avec l'ID
+            window.location.href = `facture.php?bl_id=${orderId}`;
         };
 
         window.viewBL = function(orderId) {
-            window.location.href = `facturation.php?bl_id=${orderId}`;
+            window.location.href = `facture.php?bl_id=${orderId}`;
         };
 
         // Filter documents
