@@ -358,17 +358,100 @@ function updateInvoiceStatus($pdo, $invoiceId) {
     $stmt->execute([$newStatus, $invoiceId]);
 }
 
+/**
+ * Supplier / Stock management
+ * New behavior: we store supplier information in a `suppliers` table and link stock.item -> stock.supplier_id
+ * NOTE: The database must be migrated to add the suppliers table and the supplier_id column in stock.
+ */
+
+// --- IMPORTANT FIX: Ensure 'suppliers' table and 'stock.supplier_id' column exist to avoid fatal error ---
+// This runs once at runtime and will create the suppliers table and add the supplier_id column to stock if they don't exist.
+// If you prefer to run the SQL migration manually, remove this block and run the migration SQL instead.
+
+try {
+    // Create suppliers table if it doesn't exist
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `suppliers` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            `name` varchar(200) NOT NULL,
+            `contact_person` varchar(200) DEFAULT NULL,
+            `email` varchar(150) DEFAULT NULL,
+            `phone` varchar(50) DEFAULT NULL,
+            `address` text,
+            `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+} catch (PDOException $e) {
+    // Do not die here — we'll fallback later. Log or ignore
+    // error_log('Could not create suppliers table: ' . $e->getMessage());
+}
+
+try {
+    // Add supplier_id column to stock if it doesn't exist (safe check via information_schema)
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'stock' AND COLUMN_NAME = 'supplier_id'");
+    $stmt->execute([$dbname]);
+    $colExists = (int)$stmt->fetchColumn();
+
+    if ($colExists === 0) {
+        // Add column and index
+        $pdo->exec("ALTER TABLE `stock` ADD COLUMN `supplier_id` INT DEFAULT NULL");
+        $pdo->exec("ALTER TABLE `stock` ADD INDEX (`supplier_id`)");
+    }
+} catch (PDOException $e) {
+    // ignore — if it fails, supplier features will still attempt to work without the column/table and return a readable error
+    // error_log('Could not add supplier_id to stock: ' . $e->getMessage());
+}
+
 function addSupplier($pdo) {
     try {
-        $stmt = $pdo->prepare("INSERT INTO stock (item_name, quantity, unit, low_stock_limit) VALUES (?, ?, ?, ?)");
-        $stmt->execute([
-            $_POST['name'],
-            $_POST['quantity'] ?: 0,
-            $_POST['unit'] ?: 'unité',
-            $_POST['low_stock_limit'] ?: 10
-        ]);
-        echo json_encode(['success' => true, 'id' => $pdo->lastInsertId(), 'message' => 'Fournisseur ajouté avec succès']);
+        $pdo->beginTransaction();
+
+        // If suppliers table exists, insert company info, else only insert stock
+        $supplierCompanyId = null;
+        $hasSuppliersTable = tableExists($pdo, 'suppliers');
+
+        if ($hasSuppliersTable) {
+            $stmt = $pdo->prepare("INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $_POST['supplier_company_name'] ?? null,
+                $_POST['contact_person'] ?? null,
+                $_POST['supplier_email'] ?? null,
+                $_POST['supplier_phone'] ?? null,
+                $_POST['supplier_address'] ?? null
+            ]);
+            $supplierCompanyId = $pdo->lastInsertId();
+        }
+
+        // Insert stock item linked to supplier if supplier_id column exists
+        $hasSupplierIdColumn = columnExists($pdo, $GLOBALS['dbname'], 'stock', 'supplier_id');
+
+        if ($hasSupplierIdColumn) {
+            $stmt = $pdo->prepare("INSERT INTO stock (item_name, quantity, unit, low_stock_limit, supplier_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $_POST['item_name'] ?? '',
+                $_POST['quantity'] ?: 0,
+                $_POST['unit'] ?: 'unité',
+                $_POST['low_stock_limit'] ?: 10,
+                $supplierCompanyId
+            ]);
+        } else {
+            // Fallback: insert without supplier_id
+            $stmt = $pdo->prepare("INSERT INTO stock (item_name, quantity, unit, low_stock_limit) VALUES (?, ?, ?, ?)");
+            $stmt->execute([
+                $_POST['item_name'] ?? '',
+                $_POST['quantity'] ?: 0,
+                $_POST['unit'] ?: 'unité',
+                $_POST['low_stock_limit'] ?: 10
+            ]);
+        }
+
+        $stockId = $pdo->lastInsertId();
+
+        $pdo->commit();
+        echo json_encode(['success' => true, 'id' => $stockId, 'message' => 'Fournisseur et article ajoutés avec succès']);
     } catch (PDOException $e) {
+        $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
     }
     exit();
@@ -376,16 +459,68 @@ function addSupplier($pdo) {
 
 function updateSupplier($pdo) {
     try {
-        $stmt = $pdo->prepare("UPDATE stock SET item_name = ?, quantity = ?, unit = ?, low_stock_limit = ? WHERE id = ?");
-        $stmt->execute([
-            $_POST['name'],
-            $_POST['quantity'] ?: 0,
-            $_POST['unit'] ?: 'unité',
-            $_POST['low_stock_limit'] ?: 10,
-            $_POST['id']
-        ]);
-        echo json_encode(['success' => true, 'message' => 'Fournisseur mis à jour avec succès']);
+        $pdo->beginTransaction();
+        
+        // stock id is passed as id
+        $stockId = $_POST['id'] ?? null;
+        $supplierCompanyId = $_POST['supplier_company_id'] ?? null;
+        
+        $hasSuppliersTable = tableExists($pdo, 'suppliers');
+        $hasSupplierIdColumn = columnExists($pdo, $GLOBALS['dbname'], 'stock', 'supplier_id');
+
+        // If suppliers table exists and supplierCompanyId provided, update supplier, otherwise create new supplier (if suppliers table exists)
+        $finalSupplierId = null;
+        if ($hasSuppliersTable) {
+            if (!empty($supplierCompanyId)) {
+                $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, contact_person = ?, email = ?, phone = ?, address = ? WHERE id = ?");
+                $stmt->execute([
+                    $_POST['supplier_company_name'] ?? null,
+                    $_POST['contact_person'] ?? null,
+                    $_POST['supplier_email'] ?? null,
+                    $_POST['supplier_phone'] ?? null,
+                    $_POST['supplier_address'] ?? null,
+                    $supplierCompanyId
+                ]);
+                $finalSupplierId = $supplierCompanyId;
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO suppliers (name, contact_person, email, phone, address) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([
+                    $_POST['supplier_company_name'] ?? null,
+                    $_POST['contact_person'] ?? null,
+                    $_POST['supplier_email'] ?? null,
+                    $_POST['supplier_phone'] ?? null,
+                    $_POST['supplier_address'] ?? null
+                ]);
+                $finalSupplierId = $pdo->lastInsertId();
+            }
+        }
+
+        // Update stock item (include supplier_id only if column exists)
+        if ($hasSupplierIdColumn) {
+            $stmt = $pdo->prepare("UPDATE stock SET item_name = ?, quantity = ?, unit = ?, low_stock_limit = ?, supplier_id = ? WHERE id = ?");
+            $stmt->execute([
+                $_POST['item_name'] ?? '',
+                $_POST['quantity'] ?: 0,
+                $_POST['unit'] ?: 'unité',
+                $_POST['low_stock_limit'] ?: 10,
+                $finalSupplierId,
+                $stockId
+            ]);
+        } else {
+            $stmt = $pdo->prepare("UPDATE stock SET item_name = ?, quantity = ?, unit = ?, low_stock_limit = ? WHERE id = ?");
+            $stmt->execute([
+                $_POST['item_name'] ?? '',
+                $_POST['quantity'] ?: 0,
+                $_POST['unit'] ?: 'unité',
+                $_POST['low_stock_limit'] ?: 10,
+                $stockId
+            ]);
+        }
+        
+        $pdo->commit();
+        echo json_encode(['success' => true, 'message' => 'Fournisseur/stock mis à jour avec succès']);
     } catch (PDOException $e) {
+        $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
     }
     exit();
@@ -393,13 +528,58 @@ function updateSupplier($pdo) {
 
 function deleteSupplier($pdo) {
     try {
+        $pdo->beginTransaction();
+        
+        // Get stock row before deleting to know supplier_id
+        $stmt = $pdo->prepare("SELECT supplier_id FROM stock WHERE id = ?");
+        $stmt->execute([$_POST['id']]);
+        $row = $stmt->fetch();
+        $supplierId = $row['supplier_id'] ?? null;
+        
+        // Delete stock row
         $stmt = $pdo->prepare("DELETE FROM stock WHERE id = ?");
         $stmt->execute([$_POST['id']]);
-        echo json_encode(['success' => true, 'message' => 'Fournisseur supprimé avec succès']);
+        
+        // If supplier exists and no other stock item references it, delete supplier (optional behavior)
+        if ($supplierId && tableExists($pdo, 'suppliers')) {
+            $stmt = $pdo->prepare("SELECT COUNT(*) as cnt FROM stock WHERE supplier_id = ?");
+            $stmt->execute([$supplierId]);
+            $count = $stmt->fetch()['cnt'] ?? 0;
+            if ($count == 0) {
+                $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ?");
+                $stmt->execute([$supplierId]);
+            }
+        }
+        
+        $pdo->commit();
+        echo json_encode(['success' => true, 'message' => 'Fournisseur/stock supprimé avec succès']);
     } catch (PDOException $e) {
+        $pdo->rollBack();
         echo json_encode(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
     }
     exit();
+}
+
+// Helper to check if a table exists
+function tableExists($pdo, $table) {
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?");
+        $stmt->execute([$GLOBALS['dbname'], $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
+}
+
+// Helper to check if a column exists
+function columnExists($pdo, $schema, $table, $column) {
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+        $stmt->execute([$schema, $table, $column]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (PDOException $e) {
+        return false;
+    }
 }
 
 function getOrderDetails($pdo) {
@@ -495,7 +675,25 @@ function getPayments($pdo) {
 }
 
 function getSuppliers($pdo) {
-    $stmt = $pdo->query("SELECT * FROM stock ORDER BY updated_at DESC");
+    // If suppliers table exists and stock has supplier_id, join; otherwise fallback to stock-only view
+    $hasSuppliersTable = tableExists($pdo, 'suppliers');
+    $hasSupplierIdColumn = columnExists($pdo, $GLOBALS['dbname'], 'stock', 'supplier_id');
+
+    if ($hasSuppliersTable && $hasSupplierIdColumn) {
+        $stmt = $pdo->query("
+            SELECT s.*, sup.id as supplier_id, sup.name as supplier_name, sup.contact_person, sup.phone as supplier_phone, sup.email as supplier_email, sup.address as supplier_address
+            FROM stock s
+            LEFT JOIN suppliers sup ON s.supplier_id = sup.id
+            ORDER BY s.updated_at DESC
+        ");
+    } else {
+        // Fallback: return stock rows with empty supplier fields
+        $stmt = $pdo->query("
+            SELECT s.*, NULL as supplier_id, NULL as supplier_name, NULL as contact_person, NULL as supplier_phone, NULL as supplier_email, NULL as supplier_address
+            FROM stock s
+            ORDER BY s.updated_at DESC
+        ");
+    }
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -516,9 +714,19 @@ function getStats($pdo) {
     $stmt = $pdo->query("SELECT COUNT(*) as count FROM orders");
     $stats['orders'] = $stmt->fetch()['count'];
     
-    // Suppliers count
-    $stmt = $pdo->query("SELECT COUNT(*) as count FROM stock");
-    $stats['suppliers'] = $stmt->fetch()['count'];
+    // Suppliers count (count of distinct suppliers) - if suppliers table exists
+    if (tableExists($pdo, 'suppliers')) {
+        $stmt = $pdo->query("SELECT COUNT(*) as count FROM suppliers");
+        $stats['suppliers'] = $stmt->fetch()['count'];
+    } else {
+        // fallback to 0 or count distinct supplier_id in stock if column exists
+        if (columnExists($pdo, $GLOBALS['dbname'], 'stock', 'supplier_id')) {
+            $stmt = $pdo->query("SELECT COUNT(DISTINCT supplier_id) as count FROM stock WHERE supplier_id IS NOT NULL");
+            $stats['suppliers'] = $stmt->fetch()['count'];
+        } else {
+            $stats['suppliers'] = 0;
+        }
+    }
     
     // Total revenue (from orders)
     $stmt = $pdo->query("SELECT SUM(total) as revenue FROM orders WHERE status != 'cancelled'");
@@ -1495,7 +1703,9 @@ $stats = getStats($pdo);
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Nom</th>
+                                    <th>Article</th>
+                                    <th>Fournisseur</th>
+                                    <th>Contact</th>
                                     <th>Quantité</th>
                                     <th>Unité</th>
                                     <th>Limite basse</th>
@@ -1508,13 +1718,23 @@ $stats = getStats($pdo);
                                 <tr>
                                     <td><?php echo $supplier['id']; ?></td>
                                     <td><?php echo htmlspecialchars($supplier['item_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($supplier['supplier_name'] ?? '-'); ?></td>
+                                    <td><?php echo htmlspecialchars((!empty($supplier['supplier_phone']) ? $supplier['supplier_phone'] : '') . (!empty($supplier['supplier_email']) ? ' / ' . $supplier['supplier_email'] : '')); ?></td>
                                     <td><span class="<?php echo ($supplier['quantity'] <= $supplier['low_stock_limit']) ? 'status status-pending' : ''; ?>"><?php echo $supplier['quantity']; ?></span></td>
                                     <td><?php echo htmlspecialchars($supplier['unit']); ?></td>
                                     <td><?php echo $supplier['low_stock_limit']; ?></td>
                                     <td><?php echo date('d/m/Y H:i', strtotime($supplier['updated_at'])); ?></td>
                                     <td>
                                         <div class="action-buttons">
-                                            <div class="action-btn edit-supplier" data-id="<?php echo $supplier['id']; ?>">
+                                            <div class="action-btn edit-supplier"
+                                                data-id="<?php echo $supplier['id']; ?>"
+                                                data-supplier-id="<?php echo $supplier['supplier_id'] ?? ''; ?>"
+                                                data-supplier-name="<?php echo htmlspecialchars($supplier['supplier_name'] ?? ''); ?>"
+                                                data-contact-person="<?php echo htmlspecialchars($supplier['contact_person'] ?? ''); ?>"
+                                                data-supplier-phone="<?php echo htmlspecialchars($supplier['supplier_phone'] ?? ''); ?>"
+                                                data-supplier-email="<?php echo htmlspecialchars($supplier['supplier_email'] ?? ''); ?>"
+                                                data-supplier-address="<?php echo htmlspecialchars($supplier['supplier_address'] ?? ''); ?>"
+                                            >
                                                 <i class="fas fa-edit"></i>
                                             </div>
                                             <div class="action-btn delete delete-supplier" data-id="<?php echo $supplier['id']; ?>">
@@ -1656,7 +1876,7 @@ $stats = getStats($pdo);
                                     $totalPaid = $order['total_paid'] ?? 0;
                                 ?>
                                 <option value="<?php echo $order['id']; ?>" data-total="<?php echo htmlspecialchars($total); ?>" data-paid="<?php echo htmlspecialchars($totalPaid); ?>">
-                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?> DA, Payé: <?php echo number_format($totalPaid, 2); ?> DA)
+                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?> DA)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -1711,16 +1931,27 @@ $stats = getStats($pdo);
             </div>
             <div class="modal-body">
                 <form id="supplierForm">
-                    <input type="hidden" id="supplierId" name="id">
+                    <input type="hidden" id="supplierId" name="id"> <!-- stock id -->
+                    <input type="hidden" id="supplierCompanyId" name="supplier_company_id"> <!-- suppliers.id -->
                     <input type="hidden" name="action" id="supplierAction" value="add_supplier">
                     <div class="form-group">
-                        <label for="supplierName">Nom de l'article *</label>
-                            <input type="text" id="supplierName" name="name" class="form-control" required>
+                        <label for="supplierCompanyName">Nom Fournisseur / Société *</label>
+                        <input type="text" id="supplierCompanyName" name="supplier_company_name" class="form-control" required>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="supplierQuantity">Quantité</label>
-                            <input type="number" id="supplierQuantity" name="quantity" class="form-control" min="0" value="0">
+                            <label for="contactPerson">Contact (Nom)</label>
+                            <input type="text" id="contactPerson" name="contact_person" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="supplierPhone">Téléphone</label>
+                            <input type="text" id="supplierPhone" name="supplier_phone" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="supplierEmail">Email</label>
+                            <input type="email" id="supplierEmail" name="supplier_email" class="form-control">
                         </div>
                         <div class="form-group">
                             <label for="supplierUnit">Unité</label>
@@ -1728,8 +1959,25 @@ $stats = getStats($pdo);
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="supplierLimit">Limite de stock basse</label>
-                        <input type="number" id="supplierLimit" name="low_stock_limit" class="form-control" min="0" value="10">
+                        <label for="supplierAddress">Adresse</label>
+                        <textarea id="supplierAddress" name="supplier_address" class="form-control" rows="2"></textarea>
+                    </div>
+
+                    <hr>
+
+                    <div class="form-group">
+                        <label for="supplierItemName">Nom de l'article *</label>
+                        <input type="text" id="supplierItemName" name="item_name" class="form-control" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="supplierQuantity">Quantité</label>
+                            <input type="number" id="supplierQuantity" name="quantity" class="form-control" min="0" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="supplierLimit">Limite de stock basse</label>
+                            <input type="number" id="supplierLimit" name="low_stock_limit" class="form-control" min="0" value="10">
+                        </div>
                     </div>
                 </form>
             </div>
@@ -1874,10 +2122,11 @@ $stats = getStats($pdo);
                     editPayment(paymentId);
                 }
                 
-                // Edit supplier
+                // Edit supplier (uses data attributes set in the row)
                 if (e.target.closest('.edit-supplier')) {
-                    const supplierId = e.target.closest('.edit-supplier').getAttribute('data-id');
-                    editSupplier(supplierId);
+                    const el = e.target.closest('.edit-supplier');
+                    const supplierId = el.getAttribute('data-id'); // stock id
+                    editSupplier(supplierId, el.dataset);
                 }
                 
                 // Delete actions
@@ -1999,6 +2248,7 @@ $stats = getStats($pdo);
             document.getElementById('supplierModalTitle').textContent = 'Nouveau Fournisseur/Stock';
             document.getElementById('supplierForm').reset();
             document.getElementById('supplierId').value = '';
+            document.getElementById('supplierCompanyId').value = '';
             document.getElementById('supplierAction').value = 'add_supplier';
             document.getElementById('supplierModal').classList.add('active');
         }
@@ -2092,14 +2342,29 @@ $stats = getStats($pdo);
             }
         }
 
-        function editSupplier(supplierId) {
-            const row = document.querySelector(`.edit-supplier[data-id="${supplierId}"]`).closest('tr');
+        function editSupplier(stockId, data = {}) {
+            // Fill modal with data attributes; fall back to table cells if needed
             document.getElementById('supplierModalTitle').textContent = 'Modifier le Fournisseur/Stock';
-            document.getElementById('supplierId').value = supplierId;
-            document.getElementById('supplierName').value = row.cells[1].textContent.trim();
-            document.getElementById('supplierQuantity').value = parseInt(row.cells[2].textContent) || 0;
-            document.getElementById('supplierUnit').value = row.cells[3].textContent.trim();
-            document.getElementById('supplierLimit').value = parseInt(row.cells[4].textContent) || 0;
+            document.getElementById('supplierId').value = stockId || '';
+            document.getElementById('supplierCompanyId').value = data.supplierId || '';
+            document.getElementById('supplierCompanyName').value = data.supplierName || '';
+            document.getElementById('contactPerson').value = data.contactPerson || '';
+            document.getElementById('supplierPhone').value = data.supplierPhone || '';
+            document.getElementById('supplierEmail').value = data.supplierEmail || '';
+            document.getElementById('supplierAddress').value = data.supplierAddress || '';
+
+            // For item fields, try to read row cells
+            try {
+                const row = document.querySelector(`.edit-supplier[data-id="${stockId}"]`).closest('tr');
+                document.getElementById('supplierItemName').value = row.cells[1].textContent.trim();
+                const qtyText = row.cells[4].textContent.trim();
+                document.getElementById('supplierQuantity').value = parseInt(qtyText) || 0;
+                document.getElementById('supplierUnit').value = row.cells[5].textContent.trim();
+                document.getElementById('supplierLimit').value = parseInt(row.cells[6].textContent.trim()) || 10;
+            } catch (err) {
+                // ignore if not available
+            }
+
             document.getElementById('supplierAction').value = 'update_supplier';
             document.getElementById('supplierModal').classList.add('active');
         }
