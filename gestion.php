@@ -465,8 +465,10 @@ function getClients($pdo) {
 }
 
 function getOrders($pdo) {
+    // Include order_items.description so description is available in the $orders array
     $stmt = $pdo->query("
-        SELECT o.*, c.name as client_name, 
+        SELECT o.*, c.name as client_name,
+               oi.description AS description,
                COALESCE(oi.subtotal, o.total) as total_amount,
                i.status as invoice_status,
                i.id as invoice_id,
@@ -1403,7 +1405,7 @@ $stats = getStats($pdo);
                                     <td><?php echo $order['deadline'] ? date('d/m/Y', strtotime($order['deadline'])) : 'N/A'; ?></td>
                                     <td><strong><?php echo number_format($order['total_amount'] ?? $order['total'], 2); ?> DA</strong></td>
                                     <td><span class="amount-paid"><?php echo number_format($order['total_paid'] ?? 0, 2); ?> DA</span></td>
-                                    <td><span class="amount-remaining"><?php echo number_format($order['remaining'] ?? $order['total'], 2); ?> €</span></td>
+                                    <td><span class="amount-remaining"><?php echo number_format($order['remaining'] ?? $order['total'], 2); ?> DA</span></td>
                                     <td>
                                         <div class="action-buttons">
                                             <div class="action-btn view-order" data-id="<?php echo $order['id']; ?>" title="Voir détails">
@@ -1506,7 +1508,7 @@ $stats = getStats($pdo);
                                 <tr>
                                     <td><?php echo $supplier['id']; ?></td>
                                     <td><?php echo htmlspecialchars($supplier['item_name']); ?></td>
-                                    <td><span class="<?php echo $supplier['quantity'] <= $supplier['low_stock_limit'] ? 'status status-pending' : ''; ?>"><?php echo $supplier['quantity']; ?></span></td>
+                                    <td><span class="<?php echo ($supplier['quantity'] <= $supplier['low_stock_limit']) ? 'status status-pending' : ''; ?>"><?php echo $supplier['quantity']; ?></span></td>
                                     <td><?php echo htmlspecialchars($supplier['unit']); ?></td>
                                     <td><?php echo $supplier['low_stock_limit']; ?></td>
                                     <td><?php echo date('d/m/Y H:i', strtotime($supplier['updated_at'])); ?></td>
@@ -1652,10 +1654,9 @@ $stats = getStats($pdo);
                                 <?php 
                                     $total = $order['total_amount'] ?? $order['total'];
                                     $totalPaid = $order['total_paid'] ?? 0;
-                                    $remaining = $order['remaining'] ?? $total;
                                 ?>
-                                <option value="<?php echo $order['id']; ?>" data-total="<?php echo $total; ?>" data-paid="<?php echo $totalPaid; ?>">
-                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?>DA, Payé: <?php echo number_format($totalPaid, 2); ?>DA, Reste: <?php echo number_format($remaining, 2); ?>€)
+                                <option value="<?php echo $order['id']; ?>" data-total="<?php echo htmlspecialchars($total); ?>" data-paid="<?php echo htmlspecialchars($totalPaid); ?>">
+                                    CMD-<?php echo str_pad($order['id'], 3, '0', STR_PAD_LEFT); ?> - <?php echo htmlspecialchars($order['client_name']); ?> (Total: <?php echo number_format($total, 2); ?> DA, Payé: <?php echo number_format($totalPaid, 2); ?> DA)
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -1665,7 +1666,7 @@ $stats = getStats($pdo);
                         <div class="form-group">
                             <label for="paymentAmount">Montant (DA) *</label>
                             <input type="number" id="paymentAmount" name="amount" class="form-control" required min="0" step="0.01">
-                            <small id="remainingAmount">Reste à payer: <span id="remainingValue">0.00</span>DA</small>
+                            <small id="remainingAmount">Reste à payer: <span id="remainingValue">0.00</span> DA</small>
                         </div>
                         <div class="form-group">
                             <label for="paymentDate">Date *</label>
@@ -1770,12 +1771,16 @@ $stats = getStats($pdo);
             setupEventListeners();
             // Set today's date for deadline fields
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('orderDeadline').min = today;
-            document.getElementById('paymentDate').value = today;
+            const orderDeadlineElem = document.getElementById('orderDeadline');
+            if (orderDeadlineElem) orderDeadlineElem.min = today;
+            const paymentDateElem = document.getElementById('paymentDate');
+            if (paymentDateElem) paymentDateElem.value = today;
             
             // Setup payment order change event
-            document.getElementById('paymentOrder').addEventListener('change', updateRemainingAmount);
-            document.getElementById('paymentAmount').addEventListener('input', validatePaymentAmount);
+            const paymentOrderElem = document.getElementById('paymentOrder');
+            if (paymentOrderElem) paymentOrderElem.addEventListener('change', updateRemainingAmount);
+            const paymentAmountElem = document.getElementById('paymentAmount');
+            if (paymentAmountElem) paymentAmountElem.addEventListener('input', validatePaymentAmount);
         });
 
         // Event Listeners
@@ -1805,25 +1810,37 @@ $stats = getStats($pdo);
             });
 
             // Add buttons
-            document.getElementById('addNewClientBtn').addEventListener('click', openClientModal);
-            document.getElementById('addNewOrderBtn').addEventListener('click', openOrderModal);
-            document.getElementById('addNewPaymentBtn').addEventListener('click', openPaymentModal);
-            document.getElementById('addNewSupplierBtn').addEventListener('click', openSupplierModal);
-            document.getElementById('quickAddBtn').addEventListener('click', openClientModal);
+            const addClientBtn = document.getElementById('addNewClientBtn');
+            if (addClientBtn) addClientBtn.addEventListener('click', openClientModal);
+            const addOrderBtn = document.getElementById('addNewOrderBtn');
+            if (addOrderBtn) addOrderBtn.addEventListener('click', openOrderModal);
+            const addPaymentBtn = document.getElementById('addNewPaymentBtn');
+            if (addPaymentBtn) addPaymentBtn.addEventListener('click', openPaymentModal);
+            const addSupplierBtn = document.getElementById('addNewSupplierBtn');
+            if (addSupplierBtn) addSupplierBtn.addEventListener('click', openSupplierModal);
+            const quickAddBtn = document.getElementById('quickAddBtn');
+            if (quickAddBtn) quickAddBtn.addEventListener('click', openClientModal);
             
             // Add payment from order details
-            document.getElementById('addPaymentFromDetailsBtn').addEventListener('click', function() {
-                const orderId = this.getAttribute('data-order-id');
-                if (orderId) {
-                    openPaymentModalForOrder(orderId);
-                }
-            });
+            const addPaymentFromDetails = document.getElementById('addPaymentFromDetailsBtn');
+            if (addPaymentFromDetails) {
+                addPaymentFromDetails.addEventListener('click', function() {
+                    const orderId = this.getAttribute('data-order-id');
+                    if (orderId) {
+                        openPaymentModalForOrder(orderId);
+                    }
+                });
+            }
 
             // Save buttons
-            document.getElementById('saveClientBtn').addEventListener('click', saveClient);
-            document.getElementById('saveOrderBtn').addEventListener('click', saveOrder);
-            document.getElementById('savePaymentBtn').addEventListener('click', savePayment);
-            document.getElementById('saveSupplierBtn').addEventListener('click', saveSupplier);
+            const saveClientBtn = document.getElementById('saveClientBtn');
+            if (saveClientBtn) saveClientBtn.addEventListener('click', saveClient);
+            const saveOrderBtn = document.getElementById('saveOrderBtn');
+            if (saveOrderBtn) saveOrderBtn.addEventListener('click', saveOrder);
+            const savePaymentBtn = document.getElementById('savePaymentBtn');
+            if (savePaymentBtn) savePaymentBtn.addEventListener('click', savePayment);
+            const saveSupplierBtn = document.getElementById('saveSupplierBtn');
+            if (saveSupplierBtn) saveSupplierBtn.addEventListener('click', saveSupplier);
 
             // View details and edit/delete actions
             document.addEventListener('click', function(e) {
@@ -1886,30 +1903,37 @@ $stats = getStats($pdo);
             });
 
             // Close details modal
-            document.getElementById('closeDetailsBtn').addEventListener('click', () => {
+            const closeDetailsBtn = document.getElementById('closeDetailsBtn');
+            if (closeDetailsBtn) closeDetailsBtn.addEventListener('click', () => {
                 document.getElementById('orderDetailsModal').classList.remove('active');
             });
 
             // Global search
-            document.getElementById('globalSearch').addEventListener('input', function(e) {
-                const searchTerm = e.target.value.toLowerCase();
-                const activeTab = document.querySelector('.tab.active').getAttribute('data-tab');
-                
-                if (activeTab === 'clients') {
-                    searchTable('clientsTable', searchTerm);
-                } else if (activeTab === 'orders') {
-                    searchTable('ordersTable', searchTerm);
-                } else if (activeTab === 'payments') {
-                    searchTable('paymentsTable', searchTerm);
-                } else if (activeTab === 'suppliers') {
-                    searchTable('suppliersTable', searchTerm);
-                }
-            });
+            const globalSearch = document.getElementById('globalSearch');
+            if (globalSearch) {
+                globalSearch.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const activeTab = document.querySelector('.tab.active').getAttribute('data-tab');
+                    
+                    if (activeTab === 'clients') {
+                        searchTable('clientsTable', searchTerm);
+                    } else if (activeTab === 'orders') {
+                        searchTable('ordersTable', searchTerm);
+                    } else if (activeTab === 'payments') {
+                        searchTable('paymentsTable', searchTerm);
+                    } else if (activeTab === 'suppliers') {
+                        searchTable('suppliersTable', searchTerm);
+                    }
+                });
+            }
         }
 
         function searchTable(tableId, searchTerm) {
             const table = document.getElementById(tableId);
-            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+            if (!table) return;
+            const tbody = table.getElementsByTagName('tbody')[0];
+            if (!tbody) return;
+            const rows = tbody.getElementsByTagName('tr');
             
             for (let row of rows) {
                 let rowText = row.textContent.toLowerCase();
@@ -1932,7 +1956,8 @@ $stats = getStats($pdo);
             document.getElementById('orderId').value = '';
             document.getElementById('orderAction').value = 'add_order';
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('orderDeadline').value = today;
+            const orderDeadline = document.getElementById('orderDeadline');
+            if (orderDeadline) orderDeadline.value = today;
             document.getElementById('orderModal').classList.add('active');
         }
 
@@ -1942,7 +1967,8 @@ $stats = getStats($pdo);
             document.getElementById('paymentId').value = '';
             document.getElementById('paymentAction').value = 'add_payment';
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('paymentDate').value = today;
+            const paymentDate = document.getElementById('paymentDate');
+            if (paymentDate) paymentDate.value = today;
             document.getElementById('remainingValue').textContent = '0.00';
             document.getElementById('paymentModal').classList.add('active');
         }
@@ -1953,14 +1979,17 @@ $stats = getStats($pdo);
             document.getElementById('paymentId').value = '';
             document.getElementById('paymentAction').value = 'add_payment';
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('paymentDate').value = today;
+            const paymentDate = document.getElementById('paymentDate');
+            if (paymentDate) paymentDate.value = today;
             
             // Set the order
             const orderSelect = document.getElementById('paymentOrder');
-            const option = orderSelect.querySelector(`option[value="${orderId}"]`);
-            if (option) {
-                orderSelect.value = orderId;
-                updateRemainingAmount();
+            if (orderSelect) {
+                const option = orderSelect.querySelector(`option[value="${orderId}"]`);
+                if (option) {
+                    orderSelect.value = orderId;
+                    updateRemainingAmount();
+                }
             }
             
             document.getElementById('paymentModal').classList.add('active');
@@ -1979,10 +2008,10 @@ $stats = getStats($pdo);
             const row = document.querySelector(`.edit-client[data-id="${clientId}"]`).closest('tr');
             document.getElementById('clientModalTitle').textContent = 'Modifier le Client';
             document.getElementById('clientId').value = clientId;
-            document.getElementById('clientName').value = row.cells[1].textContent;
-            document.getElementById('clientEmail').value = row.cells[2].textContent;
-            document.getElementById('clientPhone').value = row.cells[3].textContent;
-            document.getElementById('clientAddress').value = row.cells[4].textContent;
+            document.getElementById('clientName').value = row.cells[1].textContent.trim();
+            document.getElementById('clientEmail').value = row.cells[2].textContent.trim();
+            document.getElementById('clientPhone').value = row.cells[3].textContent.trim();
+            document.getElementById('clientAddress').value = row.cells[4].textContent.trim();
             document.getElementById('clientAction').value = 'update_client';
             document.getElementById('clientModal').classList.add('active');
         }
@@ -1993,20 +2022,24 @@ $stats = getStats($pdo);
             document.getElementById('orderId').value = orderId;
             
             // Extract data from table row
-            const clientName = row.cells[1].textContent;
-            const description = row.cells[2].textContent;
-            const statusText = row.cells[3].querySelector('.status').textContent;
-            const deadline = row.cells[4].textContent;
-            const total = parseFloat(row.cells[5].textContent.replace(' €', '').replace(',', ''));
+            const clientName = row.cells[1].textContent.trim();
+            const description = row.cells[2].textContent.trim();
+            const statusText = row.cells[3].querySelector('.status').textContent.trim();
+            const deadline = row.cells[4].textContent.trim();
+            // Robust number parsing: remove non-number characters
+            const totalText = row.cells[5].textContent.trim();
+            const total = parseFloat(totalText.replace(/[^0-9\.-]+/g,"")) || 0;
             
             // Set form values
             document.getElementById('orderClient').value = findClientIdByName(clientName);
-            document.getElementById('orderDescription').value = description;
+            document.getElementById('orderDescription').value = description === 'N/A' ? '' : description;
             document.getElementById('orderStatus').value = getStatusValueFromText(statusText);
             
             if (deadline !== 'N/A') {
                 const deadlineDate = deadline.split('/').reverse().join('-');
                 document.getElementById('orderDeadline').value = deadlineDate;
+            } else {
+                document.getElementById('orderDeadline').value = '';
             }
             
             // For now, set default quantity and price
@@ -2027,15 +2060,16 @@ $stats = getStats($pdo);
                 document.getElementById('paymentId').value = paymentId;
                 
                 // Extract data from table row
-                const orderRef = row.cells[2].textContent;
-                const amount = parseFloat(row.cells[3].textContent.replace(' €', '').replace(',', ''));
-                const date = row.cells[4].textContent;
-                const method = row.cells[5].textContent;
-                const reference = row.cells[6].textContent;
+                const orderRef = row.cells[2].textContent.trim();
+                const amountText = row.cells[3].textContent.trim();
+                const amount = parseFloat(amountText.replace(/[^0-9\.-]+/g,"")) || 0;
+                const date = row.cells[4].textContent.trim();
+                const method = row.cells[5].textContent.trim();
+                const reference = row.cells[6].textContent.trim();
                 
                 // Set form values
                 if (orderRef !== 'N/A') {
-                    const orderId = orderRef.replace('CMD-', '');
+                    const orderId = orderRef.replace('CMD-', '').trim();
                     document.getElementById('paymentOrder').value = parseInt(orderId);
                     updateRemainingAmount();
                 }
@@ -2062,10 +2096,10 @@ $stats = getStats($pdo);
             const row = document.querySelector(`.edit-supplier[data-id="${supplierId}"]`).closest('tr');
             document.getElementById('supplierModalTitle').textContent = 'Modifier le Fournisseur/Stock';
             document.getElementById('supplierId').value = supplierId;
-            document.getElementById('supplierName').value = row.cells[1].textContent;
-            document.getElementById('supplierQuantity').value = parseInt(row.cells[2].textContent);
-            document.getElementById('supplierUnit').value = row.cells[3].textContent;
-            document.getElementById('supplierLimit').value = parseInt(row.cells[4].textContent);
+            document.getElementById('supplierName').value = row.cells[1].textContent.trim();
+            document.getElementById('supplierQuantity').value = parseInt(row.cells[2].textContent) || 0;
+            document.getElementById('supplierUnit').value = row.cells[3].textContent.trim();
+            document.getElementById('supplierLimit').value = parseInt(row.cells[4].textContent) || 0;
             document.getElementById('supplierAction').value = 'update_supplier';
             document.getElementById('supplierModal').classList.add('active');
         }
@@ -2073,6 +2107,7 @@ $stats = getStats($pdo);
         // Helper functions
         function findClientIdByName(clientName) {
             const select = document.getElementById('orderClient');
+            if (!select) return '';
             for (let option of select.options) {
                 if (option.text === clientName) {
                     return option.value;
@@ -2125,11 +2160,11 @@ $stats = getStats($pdo);
                         <p><strong>Statut:</strong> ${getStatusText(order.status)}</p>
                         <p><strong>Date limite:</strong> ${formatDate(order.deadline)}</p>
                         <p><strong>Quantité:</strong> ${order.quantity || 'N/A'}</p>
-                        <p><strong>Prix unitaire:</strong> ${order.price ? parseFloat(order.price).toFixed(2) + ' €' : 'N/A'}</p>
-                        <p><strong>Sous-total:</strong> ${order.subtotal ? parseFloat(order.subtotal).toFixed(2) + ' €' : 'N/A'}</p>
-                        <p><strong>Total commande:</strong> <strong>${parseFloat(order.total).toFixed(2)} €</strong></p>
-                        <p><strong>Total payé:</strong> <span class="amount-paid">${parseFloat(order.total_paid || 0).toFixed(2)} €</span></p>
-                        <p><strong>Reste à payer:</strong> <span class="amount-remaining">${parseFloat(order.remaining || order.total).toFixed(2)} €</span></p>
+                        <p><strong>Prix unitaire:</strong> ${order.price ? parseFloat(order.price).toFixed(2) + ' DA' : 'N/A'}</p>
+                        <p><strong>Sous-total:</strong> ${order.subtotal ? parseFloat(order.subtotal).toFixed(2) + ' DA' : 'N/A'}</p>
+                        <p><strong>Total commande:</strong> <strong>${parseFloat(order.total).toFixed(2)} DA</strong></p>
+                        <p><strong>Total payé:</strong> <span class="amount-paid">${parseFloat(order.total_paid || 0).toFixed(2)} DA</span></p>
+                        <p><strong>Reste à payer:</strong> <span class="amount-remaining">${parseFloat(order.remaining || order.total).toFixed(2)} DA</span></p>
                         <p><strong>Créé le:</strong> ${formatDate(order.created_at)}</p>
                     </div>
                 `;
@@ -2141,7 +2176,7 @@ $stats = getStats($pdo);
                             <h4>Historique des versements</h4>
                             ${order.payments.map(payment => `
                                 <div class="payment">
-                                    <p><strong>Montant:</strong> ${parseFloat(payment.amount).toFixed(2)} €</p>
+                                    <p><strong>Montant:</strong> ${parseFloat(payment.amount).toFixed(2)} DA</p>
                                     <p><strong>Date:</strong> ${formatDate(payment.payment_date)}</p>
                                     <p><strong>Méthode:</strong> ${payment.payment_method}</p>
                                     ${payment.reference ? `<p><strong>Référence:</strong> ${payment.reference}</p>` : ''}
@@ -2189,11 +2224,12 @@ $stats = getStats($pdo);
         // Payment validation
         function updateRemainingAmount() {
             const orderSelect = document.getElementById('paymentOrder');
+            if (!orderSelect) return;
             const selectedOption = orderSelect.options[orderSelect.selectedIndex];
             
             if (selectedOption && selectedOption.value) {
-                const total = parseFloat(selectedOption.getAttribute('data-total'));
-                const paid = parseFloat(selectedOption.getAttribute('data-paid'));
+                const total = parseFloat(selectedOption.getAttribute('data-total')) || 0;
+                const paid = parseFloat(selectedOption.getAttribute('data-paid')) || 0;
                 const remaining = total - paid;
                 
                 document.getElementById('remainingValue').textContent = remaining.toFixed(2);
@@ -2207,7 +2243,7 @@ $stats = getStats($pdo);
             const remaining = parseFloat(document.getElementById('remainingValue').textContent) || 0;
             
             if (amount > remaining) {
-                document.getElementById('paymentAmount').setCustomValidity(`Le montant ne peut pas dépasser ${remaining.toFixed(2)} €`);
+                document.getElementById('paymentAmount').setCustomValidity(`Le montant ne peut pas dépasser ${remaining.toFixed(2)} DA`);
             } else {
                 document.getElementById('paymentAmount').setCustomValidity('');
             }
@@ -2269,7 +2305,7 @@ $stats = getStats($pdo);
             const remaining = parseFloat(document.getElementById('remainingValue').textContent) || 0;
             
             if (amount > remaining) {
-                alert(`Erreur: Le montant ne peut pas dépasser ${remaining.toFixed(2)} €`);
+                alert(`Erreur: Le montant ne peut pas dépasser ${remaining.toFixed(2)} DA`);
                 return;
             }
             
