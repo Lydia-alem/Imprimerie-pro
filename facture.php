@@ -2066,9 +2066,7 @@
                                 <button type="button" class="btn btn-primary" id="previewInvoice">
                                     <i class="fas fa-eye"></i> Prévisualiser
                                 </button>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="fas fa-save"></i> Enregistrer
-                                </button>
+                                
                                 <button type="button" class="btn btn-info" id="printInvoice">
                                     <i class="fas fa-print"></i> Imprimer
                                 </button>
@@ -2342,9 +2340,7 @@
                                 <button type="button" class="btn btn-primary" id="previewBL">
                                     <i class="fas fa-eye"></i> Prévisualiser
                                 </button>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="fas fa-save"></i> Enregistrer BL
-                                </button>
+                                
                                 <button type="button" class="btn btn-info" id="printBL">
                                     <i class="fas fa-print"></i> Imprimer BL
                                 </button>
@@ -2547,10 +2543,10 @@
                         <img src="REM.png" alt="Logo Imprimerie" 
                              onerror="this.src='https://via.placeholder.com/100/3498db/ffffff?text=IP'">
                     </div>
-                    
-                    <p>123 Rue d'Impression, Setif Centre, Algérie</p>
-                    <p>Tél: 0660639631 | Email: Rymemballagemoderne@gmail.com</p>
-                    <p>NIF: <span id="printCompanyNif">298619280219028</span> | RC: <span id="printCompanyRc">15A0512508</span> | N° Article: <span id="printCompanyArticleNumber">19018372051</span></p>
+
+                    <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
+                    <p>Tél: 0660639631/0560988875 | Email: Rymemballagemoderne@gmail.com</p>
+                    <p>NIF: <span id="printCompanyNif">298619280219028</span> | RC: <span id="printCompanyRc">15A0512508-19/00</span> | N° Article: <span id="printCompanyArticleNumber">19018372051</span></p>
                 </div>
 
                 <div class="print-invoice-info">
@@ -2652,10 +2648,10 @@
                 
                 <div class="no-print" style="margin-top: 30px; text-align: center;">
                     <button class="btn btn-primary" id="doPrintInvoice">
-                        <i class="fas fa-print"></i> Imprimer maintenant
+                        
                     </button>
                     <button class="btn btn-info" style="margin-left: 10px;" onclick="downloadAsPDF('invoice')">
-                        <i class="fas fa-download"></i> Télécharger PDF
+                        
                     </button>
                 </div>
             </div>
@@ -2679,6 +2675,7 @@
                 </div>
 
                 <div class="print-bl-info">
+                    
                     <h3>BON DE LIVRAISON</h3>
                     <div class="print-bl-meta">
                         <div><strong>N° BL:</strong> <span id="printBLNumber"><?php echo $nextBLNumber; ?></span></div>
@@ -2788,10 +2785,10 @@
                 
                 <div class="no-print" style="margin-top: 30px; text-align: center;">
                     <button class="btn btn-primary" id="doPrintBL">
-                        <i class="fas fa-print"></i> Imprimer maintenant
+                        
                     </button>
                     <button class="btn btn-info" style="margin-left: 10px;" onclick="downloadAsPDF('bl')">
-                        <i class="fas fa-download"></i> Télécharger PDF
+                        
                     </button>
                 </div>
             </div>
@@ -4004,11 +4001,12 @@
                 
                 return `
                     <div class="invoice-header">
+                        
+                        <img src="REM.jpg" alt="Logo" style="max-width: 150px; margin-bottom: 10px;">
                         <h1>FACTURE</h1>
-                        <p><strong>IMPRIMERIE PRO</strong></p>
-                        <p>123 Rue d'Impression, Setif Centre, Algérie</p>
-                        <p>Tél: 0660639631 | Email: Rymemballagemoderne@gmail.com</p>
-                        <p>NIF: ${companyNif} | RC: ${companyRc} | N° Article: ${companyArticleNumber}</p>
+                        <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
+                        <p>Tél: 0660639631/0560988875| Email: Rymemballagemoderne@gmail.com</p>
+                        <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
@@ -4026,10 +4024,9 @@
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <div class="company-info" style="flex: 1; margin-right: 10px;">
                             <h3>Émise par:</h3>
-                            <p><strong>IMPRIMERIE PRO</strong></p>
-                            <p>123 Rue d'Impression</p>
-                            <p>Setif Centre, Algérie</p>
-                            <p>Tél: 0660639631</p>
+                            <p><strong>RYM EMBALLAGE MODERNE</strong></p>
+                            <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
+                            <p>Tél: 0660639631/0560988875</p>
                             <p>Email: Rymemballagemoderne@gmail.com</p>
                         </div>
                         <div class="client-info" style="flex: 1; margin-left: 10px;">
@@ -4126,11 +4123,11 @@
                 
                 return `
                     <div class="bl-header">
-                        <h1>BON DE LIVRAISON</h1>
-                        <p><strong>IMPRIMERIE PRO</strong></p>
-                        <p>123 Rue d'Impression, Alger Centre, Algérie</p>
-                        <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
-                        <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
+                        <img src="REM.jpg" alt="Logo" style="max-width: 150px; margin-bottom: 10px;">
+                        <h1>FACTURE</h1>
+                        <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
+                        <p>Tél: 0660639631/0560988875| Email: Rymemballagemoderne@gmail.com</p>
+                        <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
@@ -4149,10 +4146,10 @@
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <div class="company-info" style="flex: 1; margin-right: 10px;">
                             <h3>Expéditeur:</h3>
-                            <p><strong>IMPRIMERIE PRO</strong></p>
-                            <p>123 Rue d'Impression</p>
-                            <p>Alger Centre, Algérie</p>
-                            <p>Tél: 021 23 45 67</p>
+                            <p><strong>RYM EMBALLAGE MODERNE</strong></p>
+                            <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
+                            <p>Tél: 0660639631/0560988875</p>
+                            <p>Email: Rymemballagemoderne@gmail.com</p>
                         </div>
                         <div class="client-info" style="flex: 1; margin-left: 10px;">
                             <h3>Destinataire:</h3>
