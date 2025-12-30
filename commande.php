@@ -965,61 +965,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_order_details'])) {
                 align-items: stretch;
             }
         }
+         .sidebar-header img {
+            width: 210px;
+            height: 80px;
+            
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <i class="fas fa-print fa-2x"></i>
-            <h2>Imprimerie Pro</h2>
+             <img src="REM.jpg" alt="Logo Imprimerie" >
         </div>
-        <div class="sidebar-menu">
-            <ul>
-                <li>
-                    <a href="commande_client.php">
-                        <i class="fas fa-home"></i>
-                        <span>Accueil</span>
+        <!-- Sidebar Menu Section -->
+<div class="sidebar-menu">
+    <ul>
+        <li >
+            <a href="dashboard.php">
+                <i class="fas fa-home"></i>
+                <span>Tableau de Bord</span>
+            </a>
+        </li>
+        <li >
+                    <a href="probleme.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Problèmes Urgents</span>
                     </a>
                 </li>
-                <li class="active">
-                    <a href="#">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Commandes Clients</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="ajustestock.php">
-                        <i class="fas fa-box"></i>
-                        <span>Stock</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="gestion.php">
-                        <i class="fas fa-users"></i>
-                        <span>Gestion Clients</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="employees.php">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Employés</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="facture.php">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>Facturation</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="logout.php">
-                        <i class="fas fa-sign-out-alt"></i>
-                        <span>Déconnexion</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+        <li class="active">
+            <a href="commande.php">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Commandes</span>
+            </a>
+        </li>
+        <li>
+            <a href="devis.php">
+                <i class="fas fa-file-invoice"></i>
+                <span>Devis</span>
+            </a>
+        </li>
+        <li>
+            <a href="depenses.php">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>Dépenses</span>
+            </a>
+        </li>
+        <li>
+            <a href="ajustestock.php">
+                <i class="fas fa-box"></i>
+                <span>Stock</span>
+            </a>
+        </li>
+        <li>
+            <a href="facture.php">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Facturation</span>
+            </a>
+        </li>
+        <li>
+            <a href="employees.php">
+                <i class="fas fa-user-tie"></i>
+                <span>Employés</span>
+            </a>
+        </li>
+        <li>
+            <a href="gestion.php">
+                <i class="fas fa-cogs"></i>
+                <span>Gestion</span>
+            </a>
+        </li>
+        <li>
+            <a href="ventes.php">
+                <i class="fas fa-sales"></i>
+                <span>Ventes</span>
+            </a>
+        </li>
+        <li>
+            <a href="profile.php">
+                <i class="fas fa-user"></i>
+                <span>Mon Profil</span>
+            </a>
+        </li>
+    </ul>
+</div>
     </div>
 
     <!-- Main Content -->

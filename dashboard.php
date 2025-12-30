@@ -23,8 +23,8 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// Check if user is logged in (basic authentication - you should enhance this)
-$isLoggedIn = true; // For demo purposes
+// Check if user is logged in
+$isLoggedIn = isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true;
 
 // Fetch statistics from database
 function getDashboardStats($pdo) {
@@ -61,118 +61,32 @@ function getDashboardStats($pdo) {
     $stmt->execute([$threeDaysLater]);
     $stats['urgent_issues'] = $stmt->fetch()['count'];
     
+    // Devis count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM quotes WHERE status = 'pending'");
+    $stats['pending_quotes'] = $stmt->fetch()['count'];
+    
+    // Dépenses count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM general_depenses");
+    $stats['depenses'] = $stmt->fetch()['count'];
+    
+    // Factures count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM invoices WHERE status = 'unpaid'");
+    $stats['unpaid_invoices'] = $stmt->fetch()['count'];
+    
+    // Employés count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM employees");
+    $stats['employees'] = $stmt->fetch()['count'];
+    
+    // Ventes count
+    $stmt = $pdo->query("SELECT COUNT(*) as count FROM invoices WHERE status = 'paid'");
+    $stats['sales'] = $stmt->fetch()['count'];
+    
     return $stats;
-}
-
-// Fetch recent orders
-function getRecentOrders($pdo, $limit = 5) {
-    $stmt = $pdo->prepare("
-        SELECT o.*, c.name as client_name 
-        FROM orders o
-        LEFT JOIN clients c ON o.client_id = c.id
-        ORDER BY o.created_at DESC
-        LIMIT ?
-    ");
-    $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-    $stmt->execute();
-    return $stmt->fetchAll();
-}
-
-// Fetch order items for a specific order
-function getOrderItems($pdo, $orderId) {
-    $stmt = $pdo->prepare("
-        SELECT oi.*, p.name as product_name 
-        FROM order_items oi
-        LEFT JOIN products p ON oi.product_id = p.id
-        WHERE oi.order_id = ?
-    ");
-    $stmt->execute([$orderId]);
-    return $stmt->fetchAll();
-}
-
-// Fetch orders chart data (last 30 days)
-function getOrdersChartData($pdo) {
-    $labels = [];
-    $data = [];
-    
-    for ($i = 6; $i >= 0; $i--) {
-        $date = date('Y-m-d', strtotime("-$i days"));
-        $labels[] = date('d M', strtotime("-$i days"));
-        
-        $stmt = $pdo->prepare("
-            SELECT COUNT(*) as count 
-            FROM orders 
-            WHERE DATE(created_at) = ?
-        ");
-        $stmt->execute([$date]);
-        $result = $stmt->fetch();
-        $data[] = $result['count'];
-    }
-    
-    return ['labels' => $labels, 'data' => $data];
-}
-
-// Fetch products chart data
-function getProductsChartData($pdo) {
-    $stmt = $pdo->query("
-        SELECT 
-            p.category,
-            COUNT(oi.id) as count
-        FROM order_items oi
-        LEFT JOIN products p ON oi.product_id = p.id
-        WHERE p.category IS NOT NULL
-        GROUP BY p.category
-        ORDER BY count DESC
-        LIMIT 5
-    ");
-    
-    $categories = [];
-    $counts = [];
-    
-    while ($row = $stmt->fetch()) {
-        $categories[] = $row['category'] ?: 'Autres';
-        $counts[] = $row['count'];
-    }
-    
-    return ['categories' => $categories, 'counts' => $counts];
-}
-
-// Get status badge class
-function getStatusClass($status) {
-    switch ($status) {
-        case 'pending':
-            return 'status-pending';
-        case 'in_production':
-            return 'status-in-progress';
-        case 'ready':
-        case 'delivered':
-            return 'status-completed';
-        case 'cancelled':
-            return 'status-cancelled';
-        default:
-            return 'status-pending';
-    }
-}
-
-// Get status text in French
-function getStatusText($status) {
-    $statusMap = [
-        'pending' => 'En attente',
-        'in_production' => 'En cours',
-        'ready' => 'Prêt',
-        'delivered' => 'Livré',
-        'cancelled' => 'Annulé'
-    ];
-    
-    return $statusMap[$status] ?? $status;
 }
 
 // Get all data
 if ($isLoggedIn) {
     $stats = getDashboardStats($pdo);
-    $recentOrders = getRecentOrders($pdo);
-    $ordersChartData = getOrdersChartData($pdo);
-    $productsChartData = getProductsChartData($pdo);
 }
 ?>
 
@@ -183,7 +97,6 @@ if ($isLoggedIn) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Imprimerie Admin - Tableau de Bord</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #2c3e50;
@@ -267,12 +180,9 @@ if ($isLoggedIn) {
         }
 
         .sidebar-header img {
-            width: 45px;
-            height: 45px;
-            background: white;
-            border-radius: 10px;
-            padding: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            width: 210px;
+            height: 80px;
+            object-fit: cover;
         }
 
         .sidebar-header h2 {
@@ -396,7 +306,7 @@ if ($isLoggedIn) {
             flex: 1;
             display: flex;
             flex-direction: column;
-            margin-left: 250px; /* Match sidebar width */
+            margin-left: 250px;
             transition: margin-left 0.3s ease;
         }
 
@@ -466,6 +376,7 @@ if ($isLoggedIn) {
             flex: 1;
         }
 
+        /* Stats Cards Section */
         .stats-cards {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -481,11 +392,15 @@ if ($isLoggedIn) {
             display: flex;
             align-items: center;
             gap: 15px;
-            transition: transform 0.3s;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: 2px solid transparent;
         }
 
         .stat-card:hover {
             transform: translateY(-5px);
+            border-color: var(--secondary);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
         }
 
         .stat-icon {
@@ -509,173 +424,157 @@ if ($isLoggedIn) {
             font-size: 0.9rem;
         }
 
-        .card-1 .stat-icon {
-            background: var(--secondary);
-        }
-
-        .card-2 .stat-icon {
-            background: var(--success);
-        }
-
-        .card-3 .stat-icon {
-            background: var(--warning);
-        }
-
-        .card-4 .stat-icon {
-            background: var(--danger);
-        }
-
-        .charts-section {
+        /* Navigation Cards Section */
+        .navigation-cards {
             display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 25px;
+            margin-top: 40px;
         }
 
-        .chart-card {
+        .nav-card {
             background: white;
-            border-radius: 10px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 25px;
             box-shadow: var(--shadow);
-        }
-
-        .chart-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .chart-header h3 {
-            font-size: 1.2rem;
-            color: var(--primary);
-        }
-
-        .chart-container {
-            height: 250px;
-            position: relative;
-        }
-
-        .recent-orders {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: var(--shadow);
-        }
-
-        .orders-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .orders-header h3 {
-            font-size: 1.2rem;
-            color: var(--primary);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        th {
-            color: var(--gray);
-            font-weight: 500;
-        }
-
-        .status {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status-in-progress {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-cancelled {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .btn {
-            padding: 8px 15px;
-            border: none;
-            border-radius: 5px;
+            text-align: center;
+            transition: all 0.3s ease;
             cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s;
+            text-decoration: none;
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            border: 2px solid transparent;
         }
 
-        .btn-primary {
-            background: var(--secondary);
+        .nav-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+            border-color: var(--secondary);
+        }
+
+        .nav-card-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
             color: white;
+            margin-bottom: 10px;
         }
 
-        .btn-primary:hover {
-            background: #2980b9;
+        .nav-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
         }
 
-        .btn-view {
-            background: transparent;
-            color: var(--secondary);
-            border: 1px solid var(--secondary);
+        .nav-card p {
+            color: var(--gray);
+            font-size: 0.9rem;
+            line-height: 1.4;
         }
 
-        .btn-view:hover {
-            background: var(--secondary);
+        /* Colors for navigation cards */
+        .nav-card-commandes .nav-card-icon { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .nav-card-devis .nav-card-icon { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .nav-card-depenses .nav-card-icon { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .nav-card-factures .nav-card-icon { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .nav-card-employes .nav-card-icon { background: linear-gradient(135deg, #f39c12, #d35400); }
+        .nav-card-ventes .nav-card-icon { background: linear-gradient(135deg, #1abc9c, #16a085); }
+
+        /* Welcome Section */
+        .welcome-section {
+            background: linear-gradient(135deg, var(--primary), #1a252f);
+            border-radius: 15px;
+            padding: 40px;
             color: white;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
         }
 
-        .order-id {
-            color: var(--secondary);
-            font-weight: 600;
-        }
-
-        /* Scrollbar Styling for Sidebar */
-        .sidebar::-webkit-scrollbar {
-            width: 5px;
-        }
-
-        .sidebar::-webkit-scrollbar-track {
+        .welcome-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
             background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            transform: translate(100px, -100px);
         }
 
-        .sidebar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
+        .welcome-section::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 50%;
+            transform: translate(-50px, 50px);
+        }
+
+        .welcome-section h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .welcome-section p {
+            font-size: 1rem;
+            opacity: 0.9;
+            max-width: 600px;
+        }
+
+        /* Stats summary */
+        .stats-summary {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        .stats-summary h3 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .summary-item {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
             border-radius: 10px;
+            border-left: 4px solid var(--secondary);
         }
 
-        .sidebar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
+        .summary-item h4 {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .summary-item p {
+            color: var(--gray);
+            font-size: 0.9rem;
         }
 
         /* Responsive */
         @media (max-width: 992px) {
-            .charts-section {
-                grid-template-columns: 1fr;
-            }
-            
             .sidebar {
                 width: 70px;
                 transform: translateX(0);
@@ -693,7 +592,8 @@ if ($isLoggedIn) {
             }
             
             .sidebar-header img {
-                margin: 0;
+                width: 50px;
+                height: 50px;
             }
             
             .sidebar-menu li {
@@ -735,6 +635,10 @@ if ($isLoggedIn) {
             .search-bar input {
                 width: 200px;
             }
+            
+            .navigation-cards {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
         }
 
         @media (max-width: 768px) {
@@ -755,17 +659,25 @@ if ($isLoggedIn) {
                 display: block;
             }
             
-            .stats-cards {
-                grid-template-columns: 1fr 1fr;
-            }
-            
             .search-bar {
                 display: none;
+            }
+            
+            .welcome-section {
+                padding: 30px 20px;
+            }
+            
+            .stats-cards,
+            .navigation-cards,
+            .summary-grid {
+                grid-template-columns: 1fr 1fr;
             }
         }
 
         @media (max-width: 576px) {
-            .stats-cards {
+            .stats-cards,
+            .navigation-cards,
+            .summary-grid {
                 grid-template-columns: 1fr;
             }
             
@@ -775,10 +687,34 @@ if ($isLoggedIn) {
                 padding: 15px;
             }
             
-            .header-left, .header-right {
+            .header-left,
+            .header-right {
                 width: 100%;
             }
+            
+            .welcome-section h2 {
+                font-size: 1.5rem;
+            }
         }
+
+        /* Scrollbar Styling for Sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .nav-card-probleme .nav-card-icon { background: linear-gradient(135deg, #e74c3c, #c0392b); }
     </style>
 </head>
 <body>
@@ -790,9 +726,10 @@ if ($isLoggedIn) {
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <i class="fas fa-print fa-2x"></i>
-            <h2>Imprimerie Pro</h2>
+            <img src="REM.jpg" alt="Logo Imprimerie">
         </div>
+        
+        <!-- Sidebar Menu Section -->
         <div class="sidebar-menu">
             <ul>
                 <li class="active">
@@ -802,21 +739,33 @@ if ($isLoggedIn) {
                     </a>
                 </li>
                 <li>
+                    <a href="probleme.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Problèmes Urgents</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="commande.php">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Commandes</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="devis.php">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>Devis</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="depenses.php">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>Dépenses</span>
+                    </a>
+                </li>
+                <li>
                     <a href="ajustestock.php">
                         <i class="fas fa-box"></i>
                         <span>Stock</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="gestion.php">
-                        <i class="fas fa-users"></i>
-                        <span>Gestion</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="employees.php">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Employés</span>
                     </a>
                 </li>
                 <li>
@@ -826,21 +775,36 @@ if ($isLoggedIn) {
                     </a>
                 </li>
                 <li>
+                    <a href="employees.php">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employés</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="gestion.php">
+                        <i class="fas fa-cogs"></i>
+                        <span>Gestion</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="ventes.php">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Ventes</span>
+                    </a>
+                </li>
+                <li>
                     <a href="profile.php">
                         <i class="fas fa-user"></i>
                         <span>Mon Profil</span>
                     </a>
                 </li>
+                <li>
+                    <a href="logout.php">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Déconnexion</span>
+                    </a>
+                </li>
             </ul>
-        </div>
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <img src="https://i.pravatar.cc/150?img=12" alt="Admin" class="user-avatar">
-                <div class="user-details">
-                    <h4>Administrateur</h4>
-                    <span>Super Admin</span>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -858,7 +822,7 @@ if ($isLoggedIn) {
                     <input type="text" placeholder="Rechercher...">
                 </div>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="" alt="Admin">
                     <span>Admin</span>
                 </div>
             </div>
@@ -867,122 +831,153 @@ if ($isLoggedIn) {
         <!-- Content -->
         <div class="content">
             <?php if ($isLoggedIn): ?>
-            <!-- Stats Cards -->
-            <div class="stats-cards">
-                <div class="stat-card card-1">
-                    <div class="stat-icon">
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $stats['pending_orders']; ?></h3>
-                        <p>Commandes en cours</p>
-                    </div>
+                <!-- Welcome Section -->
+                <div class="welcome-section">
+                    <h2>Bienvenue, <?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Administrateur'); ?>!</h2>
+                    <p>Bienvenue sur votre tableau de bord. Gérez votre imprimerie efficacement avec tous les outils à votre disposition.</p>
                 </div>
-                <div class="stat-card card-2">
-                    <div class="stat-icon">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $stats['completed_orders']; ?></h3>
-                        <p>Commandes terminées</p>
-                    </div>
-                </div>
-                <div class="stat-card card-3">
-                    <div class="stat-icon">
-                        <i class="fas fa-euro-sign"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo number_format($stats['monthly_revenue'], 2, ',', ' '); ?>DA</h3>
-                        <p>Revenu ce mois</p>
-                    </div>
-                </div>
-                <div class="stat-card card-4">
-                    <div class="stat-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3><?php echo $stats['urgent_issues']; ?></h3>
-                        <p>Problèmes urgents</p>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Charts Section -->
-            <div class="charts-section">
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Commandes des 7 derniers jours</h3>
-                        <button class="btn btn-primary">Voir rapport</button>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="ordersChart"></canvas>
+                <!-- Quick Stats -->
+                <div class="stats-summary">
+                    <h3>Aperçu Rapide</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <h4><?php echo $stats['pending_orders']; ?></h4>
+                            <p>Commandes en attente</p>
+                        </div>
+                        <div class="summary-item">
+                            <h4><?php echo number_format($stats['monthly_revenue'], 0, ',', ' '); ?> DA</h4>
+                            <p>Revenu mensuel</p>
+                        </div>
+                        <div class="summary-item">
+                            <h4><?php echo $stats['pending_quotes']; ?></h4>
+                            <p>Devis en attente</p>
+                        </div>
+                        <div class="summary-item">
+                            <h4><?php echo $stats['urgent_issues']; ?></h4>
+                            <p>Problèmes urgents</p>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Types de produits</h3>
-                        <button class="btn btn-primary">Voir détails</button>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="productsChart"></canvas>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Recent Orders -->
-            <div class="recent-orders">
-                <div class="orders-header">
-                    <h3>Commandes récentes</h3>
-                    <button class="btn btn-view">Voir toutes</button>
-                </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID Commande</th>
-                            <th>Client</th>
-                            <th>Date</th>
-                            <th>Échéance</th>
-                            <th>Total</th>
-                            <th>Statut</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($recentOrders as $order): ?>
-                        <tr>
-                            <td class="order-id">#IMP-<?php echo $order['id']; ?></td>
-                            <td><?php echo htmlspecialchars($order['client_name'] ?? 'Client inconnu'); ?></td>
-                            <td><?php echo date('d/m/Y', strtotime($order['created_at'])); ?></td>
-                            <td><?php echo $order['deadline'] ? date('d/m/Y', strtotime($order['deadline'])) : 'Non définie'; ?></td>
-                            <td>€<?php echo number_format($order['total'], 2, ',', ' '); ?></td>
-                            <td><span class="status <?php echo getStatusClass($order['status']); ?>"><?php echo getStatusText($order['status']); ?></span></td>
-                            <td><button class="btn btn-view" onclick="showOrderDetails(<?php echo $order['id']; ?>)">Détails</button></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            
-            <?php else: ?>
-            <div style="text-align: center; padding: 100px;">
-                <h2>Veuillez vous connecter</h2>
-                <p>Ce tableau de bord nécessite une authentification.</p>
-                <button class="btn btn-primary" onclick="location.href='login.php'">Se connecter</button>
-            </div>
-            <?php endif; ?>
-        </div>
+                <!-- Navigation Cards -->
+                <h2 style="margin: 30px 0 20px 0; color: var(--primary);">Accès Rapide</h2>
+                <div class="navigation-cards">
+                    <!-- Commandes Card -->
+                    <a href="commande.php" class="nav-card nav-card-commandes">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3>Commandes</h3>
+                        <p>Gérez toutes vos commandes clients et suivez leur progression</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-exclamation-circle"></i> <?php echo $stats['pending_orders']; ?> en attente
+                        </small>
+                    </a>
+
+                    <!-- Devis Card -->
+                    <a href="devis.php" class="nav-card nav-card-devis">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                        <h3>Devis</h3>
+                        <p>Créez et gérez les devis pour vos clients potentiels</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-clock"></i> <?php echo $stats['pending_quotes']; ?> en attente
+                        </small>
+                    </a>
+
+                    <!-- Dépenses Card -->
+                    <a href="depenses.php" class="nav-card nav-card-depenses">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <h3>Dépenses</h3>
+                        <p>Suivez toutes les dépenses de l'entreprise</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-list"></i> <?php echo $stats['depenses']; ?> dépenses enregistrées
+                        </small>
+                    </a>
+
+                    <!-- Factures Card -->
+                    <a href="facture.php" class="nav-card nav-card-factures">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                        </div>
+                        <h3>Facturation</h3>
+                        <p>Générez et suivez les factures de vos clients</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-exclamation-triangle"></i> <?php echo $stats['unpaid_invoices']; ?> factures impayées
+                        </small>
+                    </a>
+
+                    <!-- Employés Card -->
+                    <a href="employees.php" class="nav-card nav-card-employes">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <h3>Employés</h3>
+                        <p>Gérez votre équipe et leurs informations</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-users"></i> <?php echo $stats['employees']; ?> employés
+                        </small>
+                    </a>
+
+                    <!-- Ventes Card -->
+                    <a href="ventes.php" class="nav-card nav-card-ventes">
+                        <div class="nav-card-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Ventes</h3>
+                        <p>Analysez vos performances de vente et tendances</p>
+                        <small style="color: var(--secondary); font-weight: 500;">
+                            <i class="fas fa-check-circle"></i> <?php echo $stats['sales']; ?> ventes complétées
+                        </small>
+                    </a>
+                     
+                    <a href="probleme.php" class="nav-card nav-card-probleme">
+    <div class="nav-card-icon">
+        <i class="fas fa-exclamation-triangle"></i>
     </div>
+    <h3>Problèmes</h3>
+    <p>Détectez et gérez tous les problèmes urgents</p>
+    <small style="color: var(--warning); font-weight: 500;">
+        <i class="fas fa-exclamation-circle"></i> <?php echo $stats['urgent_issues'] ?? 0; ?> problèmes détectés
+    </small>
+</a>
+                </div>
 
-    <!-- Order Details Modal -->
-    <div id="orderModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
-        <div style="background: white; padding: 30px; border-radius: 10px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 id="modalTitle">Détails de la commande</h3>
-                <button onclick="closeOrderModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-            </div>
-            <div id="orderDetailsContent">
-                <!-- Order details will be loaded here -->
-            </div>
+            <?php else: ?>
+                <!-- Not logged in message -->
+                <div style="text-align: center; padding: 100px;">
+                    <div style="background: white; padding: 40px; border-radius: 15px; box-shadow: var(--shadow); max-width: 500px; margin: 0 auto;">
+                        <div style="font-size: 4rem; color: var(--accent); margin-bottom: 20px;">
+                            <i class="fas fa-lock"></i>
+                        </div>
+                        <h2 style="color: var(--primary); margin-bottom: 15px;">Accès Restreint</h2>
+                        <p style="color: var(--gray); margin-bottom: 30px;">Veuillez vous connecter pour accéder au tableau de bord</p>
+                        <button onclick="location.href='index.php'" style="
+                            background: var(--secondary);
+                            color: white;
+                            border: none;
+                            padding: 12px 30px;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.3s;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 10px;
+                            margin: 0 auto;
+                        ">
+                            <i class="fas fa-sign-in-alt"></i>
+                            Se connecter
+                        </button>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -1014,100 +1009,75 @@ if ($isLoggedIn) {
             });
         });
 
-        // Orders Chart
-        const ordersCtx = document.getElementById('ordersChart')?.getContext('2d');
-        if (ordersCtx) {
-            const ordersChart = new Chart(ordersCtx, {
-                type: 'line',
-                data: {
-                    labels: <?php echo json_encode($ordersChartData['labels'] ?? []); ?>,
-                    datasets: [{
-                        label: 'Commandes',
-                        data: <?php echo json_encode($ordersChartData['data'] ?? []); ?>,
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
+        // Add hover effects to nav cards
+        document.querySelectorAll('.nav-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-8px)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Add click animation to nav cards
+        document.querySelectorAll('.nav-card').forEach(card => {
+            card.addEventListener('click', function(e) {
+                // Add click animation
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 150);
+            });
+        });
+
+        // Auto-hide sidebar on mobile when clicking outside
+        if (window.innerWidth <= 768) {
+            document.addEventListener('click', function(e) {
+                const sidebar = document.getElementById('sidebar');
+                const isClickInsideSidebar = sidebar.contains(e.target);
+                const isClickOnToggle = e.target.closest('.sidebar-toggle');
+                
+                if (!isClickInsideSidebar && !isClickOnToggle) {
+                    sidebar.classList.remove('active');
                 }
             });
         }
 
-        // Products Chart
-        const productsCtx = document.getElementById('productsChart')?.getContext('2d');
-        if (productsCtx) {
-            const productsChart = new Chart(productsCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: <?php echo json_encode($productsChartData['categories'] ?? []); ?>,
-                    datasets: [{
-                        data: <?php echo json_encode($productsChartData['counts'] ?? []); ?>,
-                        backgroundColor: [
-                            '#3498db',
-                            '#2ecc71',
-                            '#f39c12',
-                            '#e74c3c',
-                            '#95a5a6',
-                            '#9b59b6'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-
-        // Show order details modal
-        function showOrderDetails(orderId) {
-            fetch('get_order_details.php?order_id=' + orderId)
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('orderDetailsContent').innerHTML = data;
-                    document.getElementById('orderModal').style.display = 'flex';
-                })
-                .catch(error => {
-                    document.getElementById('orderDetailsContent').innerHTML = 
-                        '<p>Erreur lors du chargement des détails de la commande.</p>';
-                    document.getElementById('orderModal').style.display = 'flex';
-                });
-        }
-
-        // Close order modal
-        function closeOrderModal() {
-            document.getElementById('orderModal').style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        document.getElementById('orderModal')?.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeOrderModal();
+        // Add keyboard shortcut for sidebar toggle (Ctrl+B)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                toggleSidebar();
             }
+        });
+
+        // Add animation to welcome section
+        document.addEventListener('DOMContentLoaded', function() {
+            const welcomeSection = document.querySelector('.welcome-section');
+            if (welcomeSection) {
+                welcomeSection.style.opacity = '0';
+                welcomeSection.style.transform = 'translateY(-20px)';
+                
+                setTimeout(() => {
+                    welcomeSection.style.transition = 'all 0.8s ease';
+                    welcomeSection.style.opacity = '1';
+                    welcomeSection.style.transform = 'translateY(0)';
+                }, 300);
+            }
+            
+            // Add staggered animation to nav cards
+            const navCards = document.querySelectorAll('.nav-card');
+            navCards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'all 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 500 + (index * 100));
+            });
         });
     </script>
 </body>

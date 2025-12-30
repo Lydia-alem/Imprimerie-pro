@@ -968,55 +968,251 @@ if (isset($_GET['update_status']) && isset($_GET['quote_id']) && isset($_GET['st
                 gap: 15px;
             }
         }
+        /* Additional style for submenu if needed */
+        .sidebar-submenu {
+            padding-left: 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .sidebar-submenu.active {
+            max-height: 200px;
+        }
+
+        .sidebar-submenu li {
+            margin: 3px 0;
+        }
+
+        .sidebar-submenu li a {
+            padding: 10px 20px;
+            font-size: 0.85rem;
+        }
+
+        .has-submenu > a::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: auto;
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+
+        .has-submenu.active > a::after {
+            transform: rotate(180deg);
+        }
+         /* Updated Sidebar Styles */
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, var(--primary) 0%, #1a252f 100%);
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            background: rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+        }
+
+        .sidebar-header img {
+            width: 45px;
+            height: 45px;
+            background: white;
+            border-radius: 10px;
+            padding: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(90deg, white, #ecf0f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+        }
+
+        .sidebar-menu ul {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li:hover a {
+            color: white;
+        }
+
+        .sidebar-menu li.active {
+            background: linear-gradient(90deg, var(--secondary), #2980b9);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-menu li.active a {
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-menu li.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--accent);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover i {
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu li.active i {
+            color: white;
+        }
+         .sidebar-header img {
+            width: 210px;
+            height: 80px;
+            
+            object-fit: cover;
+        }
+
     </style>
 </head>
 <body>
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <i class="fas fa-print fa-2x"></i>
-            <h2>Imprimerie Pro</h2>
+            <img src="REM.jpg" alt="Logo Imprimerie" >
         </div>
         <div class="sidebar-menu">
-            <ul>
-                <li>
-                    <a href="index.php">
-                        <i class="fas fa-home"></i>
-                        <span>Tableau de Bord</span>
+    <ul>
+        <li >
+            <a href="dashboard.php">
+                <i class="fas fa-home"></i>
+                <span>Tableau de Bord</span>
+            </a>
+        </li>
+        <li>
+                    <a href="probleme.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Problèmes Urgents</span>
                     </a>
                 </li>
-                <li>
-                    <a href="ajustestock.php">
-                        <i class="fas fa-box"></i>
-                        <span>Stock</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="ventes.php">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Ventes</span>
-                    </a>
-                </li>
-                <li class="active">
-                    <a href="#">
-                        <i class="fas fa-file-contract"></i>
-                        <span>Devis</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="facture.php">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>Facturation</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="profile.php">
-                        <i class="fas fa-user"></i>
-                        <span>Mon Profil</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+        <li >
+            <a href="commande.php">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Commandes</span>
+            </a>
+        </li>
+        <li class="active">
+            <a href="devis.php">
+                <i class="fas fa-file-invoice"></i>
+                <span>Devis</span>
+            </a>
+        </li>
+        <li>
+            <a href="depenses.php">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>Dépenses</span>
+            </a>
+        </li>
+        <li>
+            <a href="ajustestock.php">
+                <i class="fas fa-box"></i>
+                <span>Stock</span>
+            </a>
+        </li>
+        <li>
+            <a href="facture.php">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Facturation</span>
+            </a>
+        </li>
+        <li>
+            <a href="employees.php">
+                <i class="fas fa-user-tie"></i>
+                <span>Employés</span>
+            </a>
+        </li>
+        <li>
+            <a href="gestion.php">
+                <i class="fas fa-cogs"></i>
+                <span>Gestion</span>
+            </a>
+        </li>
+        <li>
+            <li>
+            <a href="ventes.php">
+                <i class="fas fa-sales"></i>
+                <span>Ventes</span>
+            </a>
+        </li>
+            <a href="profile.php">
+                <i class="fas fa-user"></i>
+                <span>Mon Profil</span>
+            </a>
+        </li>
+    </ul>
+</div>
     </div>
 
     <!-- Main Content -->
@@ -1264,7 +1460,7 @@ if (isset($_GET['update_status']) && isset($_GET['quote_id']) && isset($_GET['st
             <?php else: ?>
             <div style="text-align: center; padding: 100px;">
                 <h2>Veuillez vous connecter</h2>
-                <button class="btn btn-primary" onclick="location.href='login.php'">Se connecter</button>
+                <button class="btn btn-primary" onclick="location.href='index.php'">Se connecter</button>
             </div>
             <?php endif; ?>
         </div>

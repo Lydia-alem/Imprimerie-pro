@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['get_order_details'])) {
 if (isset($_GET['action'])) {
     if ($_GET['action'] == 'logout') {
         session_destroy();
-        header('Location: index.php');
+        header('Location: loginphp');
         exit();
     }
 }
@@ -786,7 +786,6 @@ $stats = getStats($pdo);
     <title>Imprimerie Admin - Gestion Complète</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Le CSS reste exactement le même que dans la version précédente */
         :root {
             --primary: #2c3e50;
             --secondary: #3498db;
@@ -811,75 +810,231 @@ $stats = getStats($pdo);
         body {
             background-color: #f5f7fa;
             color: var(--dark);
-            display: flex;
             min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
         }
 
-        /* Sidebar Styles */
+        /* Fixed Sidebar Styles */
         .sidebar {
             width: 250px;
-            background: var(--primary);
+            background: linear-gradient(180deg, var(--primary) 0%, #1a252f 100%);
             color: white;
-            transition: all 0.3s;
-            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
             z-index: 1000;
-        }
-
-        .sidebar-header {
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.2);
             display: flex;
-            align-items: center;
-            gap: 15px;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            left: 0;
+            top: 0;
         }
 
-        .sidebar-header img.logo {
-            width: 50px;
-            height: 50px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 2px solid var(--secondary);
-        }
-
-        .sidebar-header h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .sidebar-menu {
-            padding: 15px 0;
-        }
-
-        .sidebar-menu ul {
-            list-style: none;
-        }
-
-        .sidebar-menu li {
-            padding: 12px 20px;
-            transition: all 0.3s;
-        }
-
-        .sidebar-menu li:hover {
-            background: rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-        }
-
-        .sidebar-menu li.active {
-            background: var(--secondary);
-            border-left: 4px solid var(--accent);
-        }
-
-        .sidebar-menu i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-
-        /* Main Content Styles */
+        /* Main Content Styles - Add margin to account for fixed sidebar */
         .main-content {
             flex: 1;
             display: flex;
             flex-direction: column;
+            margin-left: 250px; /* This is the key fix - adds space for sidebar */
+            width: calc(100% - 250px);
+            min-height: 100vh;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 80px;
+            }
+            
+            .main-content {
+                margin-left: 80px;
+                width: calc(100% - 80px);
+            }
+            
+            .sidebar-header h2, .sidebar-menu span {
+                display: none;
+            }
+            
+            .sidebar-header {
+                justify-content: center;
+                padding: 20px 10px;
+            }
+            
+            .sidebar-menu i {
+                margin-right: 0;
+                font-size: 1.2rem;
+            }
+            
+            .sidebar-menu li a {
+                justify-content: center;
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .search-bar input {
+                width: 200px;
+            }
+            
+            .header {
+                padding: 15px 20px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+            
+            .stats-cards {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .sidebar {
+                width: 70px;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+                width: calc(100% - 70px);
+            }
+            
+            .search-bar {
+                display: none;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .tab {
+                flex: none;
+            }
+            
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            background: rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+        }
+
+        .sidebar-header img.logo {
+            width: 45px;
+            height: 45px;
+            background: white;
+            border-radius: 10px;
+            padding: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(90deg, white, #ecf0f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+        }
+
+        .sidebar-menu ul {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li:hover a {
+            color: white;
+        }
+
+        .sidebar-menu li.active {
+            background: linear-gradient(90deg, var(--secondary), #2980b9);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-menu li.active a {
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-menu li.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--accent);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover i {
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu li.active i {
+            color: white;
         }
 
         /* Header Styles */
@@ -1355,68 +1510,6 @@ $stats = getStats($pdo);
             background: var(--info);
         }
 
-        /* Responsive */
-        @media (max-width: 992px) {
-            .sidebar {
-                width: 80px;
-            }
-            
-            .sidebar-header h2, .sidebar-menu span {
-                display: none;
-            }
-            
-            .sidebar-menu li {
-                text-align: center;
-                padding: 15px 10px;
-            }
-            
-            .sidebar-menu i {
-                margin-right: 0;
-                font-size: 1.2rem;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .search-bar input {
-                width: 200px;
-            }
-            
-            .header {
-                padding: 15px 20px;
-            }
-            
-            .content {
-                padding: 20px;
-            }
-            
-            .form-row {
-                flex-direction: column;
-                gap: 0;
-            }
-            
-            .stats-cards {
-                grid-template-columns: 1fr 1fr;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .search-bar {
-                display: none;
-            }
-            
-            .tabs {
-                flex-direction: column;
-            }
-            
-            .tab {
-                flex: none;
-            }
-            
-            .stats-cards {
-                grid-template-columns: 1fr;
-            }
-        }
-        
         /* Amount Styles */
         .amount-paid {
             color: var(--success);
@@ -1427,25 +1520,89 @@ $stats = getStats($pdo);
             color: var(--danger);
             font-weight: 600;
         }
+         .sidebar-header img {
+            width: 210px;
+            height: 80px;
+            
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <img src="https://via.placeholder.com/50x50/3498db/ffffff?text=IP" alt="Logo" class="logo">
-            <h2>Imprimerie Pro</h2>
+             <img src="REM.jpg" alt="Logo Imprimerie" >
+            
         </div>
         <div class="sidebar-menu">
             <ul>
-                <li><i class="fas fa-home"></i> <span>Tableau de Bord</span></li>
-                <li class="active"><i class="fas fa-users"></i> <span>Clients</span></li>
-                <li><i class="fas fa-shopping-cart"></i> <span>Commandes</span></li>
-                <li><i class="fas fa-money-bill-wave"></i> <span>Versements</span></li>
-                <li><i class="fas fa-truck"></i> <span>Fournisseurs</span></li>
-                <li><i class="fas fa-box"></i> <span>Produits</span></li>
-                <li><i class="fas fa-chart-bar"></i> <span>Rapports</span></li>
-                <li><i class="fas fa-cog"></i> <span>Paramètres</span></li>
+                <li>
+                    <a href="dashboard.php">
+                        <i class="fas fa-home"></i>
+                        <span>Tableau de Bord</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="probleme.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Problèmes Urgents</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="commande.php">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span>Commandes</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="devis.php">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>Devis</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="depenses.php">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>Dépenses</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="ajustestock.php">
+                        <i class="fas fa-box"></i>
+                        <span>Stock</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="facture.php">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Facturation</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="employees.php">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Employés</span>
+                    </a>
+                </li>
+                <li class="active">
+                    <a href="gestion.php">
+                        <i class="fas fa-cogs"></i>
+                        <span>Gestion</span>
+                    </a>
+                </li>
+                <li>
+            <a href="ventes.php">
+                <i class="fas fa-sales"></i>
+                <span>Ventes</span>
+            </a>
+        </li>
+                <li>
+                    <a href="profile.php">
+                        <i class="fas fa-user"></i>
+                        <span>Mon Profil</span>
+                    </a>
+                </li>
             </ul>
         </div>
     </div>

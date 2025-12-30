@@ -55,9 +55,9 @@
         }
 
         .sidebar-header img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 210px;
+            height: 80px;
+            
             object-fit: cover;
         }
 
@@ -1077,6 +1077,262 @@
                 width: 80px;
             }
         }
+        /* Additional style for submenu if needed */
+        .sidebar-submenu {
+            padding-left: 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .sidebar-submenu.active {
+            max-height: 200px;
+        }
+
+        .sidebar-submenu li {
+            margin: 3px 0;
+        }
+
+        .sidebar-submenu li a {
+            padding: 10px 20px;
+            font-size: 0.85rem;
+        }
+
+        .has-submenu > a::after {
+            content: '\f078';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: auto;
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+
+        .has-submenu.active > a::after {
+            transform: rotate(180deg);
+        }
+        .sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+        }
+
+        .sidebar-menu ul {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li:hover a {
+            color: white;
+        }
+
+        .sidebar-menu li.active {
+            background: linear-gradient(90deg, var(--secondary), #2980b9);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-menu li.active a {
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-menu li.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--accent);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover i {
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu li.active i {
+            color: white;
+        }
+.sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+        }
+
+        .sidebar-menu ul {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li:hover a {
+            color: white;
+        }
+
+        .sidebar-menu li.active {
+            background: linear-gradient(90deg, var(--secondary), #2980b9);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-menu li.active a {
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-menu li.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--accent);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover i {
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu li.active i {
+            color: white;
+        }
+.sidebar-menu {
+            padding: 20px 0;
+            flex: 1;
+        }
+
+        .sidebar-menu ul {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .sidebar-menu li {
+            margin: 5px 0;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar-menu li a {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li:hover a {
+            color: white;
+        }
+
+        .sidebar-menu li.active {
+            background: linear-gradient(90deg, var(--secondary), #2980b9);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .sidebar-menu li.active a {
+            color: white;
+            font-weight: 600;
+        }
+
+        .sidebar-menu li.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 3px;
+            background: var(--accent);
+        }
+
+        .sidebar-menu i {
+            width: 24px;
+            font-size: 1.1rem;
+            text-align: center;
+            margin-right: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-menu li:hover i {
+            transform: scale(1.1);
+        }
+
+        .sidebar-menu li.active i {
+            color: white;
+        }
+
     </style>
 </head>
 <body>
@@ -1084,28 +1340,79 @@
     <div class="sidebar">
         <div class="sidebar-header">
             <!-- Company Logo -->
-            <img src="logo.png" alt="Logo Imprimerie" onerror="this.src='https://via.placeholder.com/40/3498db/ffffff?text=IP'">
-            <h2>Imprimerie Pro</h2>
+            <img src="REM.jpg" alt="Logo Imprimerie" >
+            
         </div>
         <div class="sidebar-menu">
-            <ul>
-                <li><i class="fas fa-home"></i> <span>Tableau de Bord</span></li>
-                <li><i class="fas fa-shopping-cart"></i> <span>Commandes</span></li>
-                <li class="active"><i class="fas fa-file-invoice-dollar"></i> <span>Facturation</span></li>
-                <li><i class="fas fa-truck"></i> <span>Livraisons</span></li>
-                <li><i class="fas fa-box"></i> <span>Produits</span></li>
-                <li><i class="fas fa-users"></i> <span>Clients</span></li>
-                <li><i class="fas fa-chart-bar"></i> <span>Rapports</span></li>
-                <li><i class="fas fa-cog"></i> <span>Paramètres</span></li>
-                <li>
-                    <form method="POST" action="logout.php" style="display: inline;">
-                        <button type="submit" class="btn-logout" style="width: 100%; text-align: left; background: none; color: white;">
-                            <i class="fas fa-sign-out-alt"></i> <span>Déconnexion</span>
-                        </button>
-                    </form>
+    <ul>
+        <li >
+            <a href="dashboard.php">
+                <i class="fas fa-home"></i>
+                <span>Tableau de Bord</span>
+            </a>
+        </li>
+        <li>
+                    <a href="probleme.php">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Problèmes Urgents</span>
+                    </a>
                 </li>
-            </ul>
-        </div>
+        <li >
+            <a href="commande.php">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Commandes</span>
+            </a>
+        </li>
+        <li>
+            <a href="devis.php">
+                <i class="fas fa-file-invoice"></i>
+                <span>Devis</span>
+            </a>
+        </li>
+        <li>
+            <a href="depenses.php">
+                <i class="fas fa-money-bill-wave"></i>
+                <span>Dépenses</span>
+            </a>
+        </li>
+        <li>
+            <a href="ajustestock.php">
+                <i class="fas fa-box"></i>
+                <span>Stock</span>
+            </a>
+        </li>
+        <li class="active">
+            <a href="facture.php">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Facturation</span>
+            </a>
+        </li>
+        <li>
+            <a href="employees.php">
+                <i class="fas fa-user-tie"></i>
+                <span>Employés</span>
+            </a>
+        </li>
+        <li>
+            <a href="gestion.php">
+                <i class="fas fa-cogs"></i>
+                <span>Gestion</span>
+            </a>
+        </li>
+        <li>
+            <a href="ventes.php">
+                <i class="fas fa-sales"></i>
+                <span>Ventes</span>
+            </a>
+        </li>
+        <li>
+            <a href="profile.php">
+                <i class="fas fa-user"></i>
+                <span>Mon Profil</span>
+            </a>
+        </li>
+    </ul>
+</div>
     </div>
 
     <!-- Main Content -->
@@ -1657,22 +1964,22 @@
                         <!-- Aperçu de la facture -->
                         <div class="invoice-preview">
                             <div class="invoice-header-preview">
-                                <h3>IMPRIMERIE PRO</h3>
-                                <p>123 Rue d'Impression, Alger Centre</p>
-                                <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
-                                <p>NIF: <span id="previewCompanyNif">123456789012345</span> | RC: <span id="previewCompanyRc">RC123456789</span> | N° Article: <span id="previewCompanyArticleNumber">ART987654321</span></p>
+                                <img src=REM.jpg alt="logo" height="50" width="100">
+                                <p> Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                                <p>Tél: 0660639631 / 0560988875 | Email:Rymemballagemoderne@gmail.com</p>
+                                <p>NIF: <span id="previewCompanyNif">298619280219028</span> | RC: <span id="previewCompanyRc">15A0512508</span> | N° Article: <span id="previewCompanyArticleNumber">19018372051</span></p>
                             </div>
 
                             <div class="invoice-info-grid">
                                 <div class="company-info">
                                     <h4>Émise par:</h4>
-                                    <p><strong>IMPRIMERIE PRO</strong></p>
-                                    <p>123 Rue d'Impression</p>
-                                    <p>Alger Centre, Algérie</p>
-                                    <p>Tél: 021 23 45 67</p>
-                                    <p>NIF: <span id="previewCompanyNif2">123456789012345</span></p>
-                                    <p>RC: <span id="previewCompanyRc2">RC123456789</span></p>
-                                    <p>N° Article: <span id="previewCompanyArticleNumber2">ART987654321</span></p>
+                                    <p><strong>REM</strong></p>
+                                    <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                                    <p>Setif Centre, Algérie</p>
+                                    <p>Tél: 0660639631 / 0560988875 </p>
+                                    <p>NIF: <span id="previewCompanyNif2">298619280219028</span></p>
+                                    <p>RC: <span id="previewCompanyRc2">15A0512508</span></p>
+                                    <p>N° Article: <span id="previewCompanyArticleNumber2">19018372051</span></p>
                                 </div>
                                 <div class="client-info">
                                     <h4>Facturé à:</h4>
@@ -1921,22 +2228,23 @@
                         <!-- Aperçu du BL -->
                         <div class="bl-preview">
                             <div class="bl-header-preview">
+                                <img src=REM.jpg alt="logo" height="50" width="100">
                                 <h3>BON DE LIVRAISON</h3>
-                                <p>123 Rue d'Impression, Alger Centre</p>
-                                <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
-                                <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
+                                <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                                <p>Tél: 0660639631 / 0560988875  | Email: Rymemballagemoderne@gmail.com</p>
+                                <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
                             </div>
 
                             <div class="bl-info-grid">
                                 <div class="company-info">
                                     <h4>Expéditeur:</h4>
-                                    <p><strong>IMPRIMERIE PRO</strong></p>
-                                    <p>123 Rue d'Impression</p>
-                                    <p>Alger Centre, Algérie</p>
-                                    <p>Tél: 021 23 45 67</p>
-                                    <p>NIF: 123456789012345</p>
-                                    <p>RC: RC123456789</p>
-                                    <p>N° Article: ART987654321</p>
+                                    <p><strong>REM</strong></p>
+                                    <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                                    <p>Setif Centre, Algérie</p>
+                                    <p>Tél: 0660639631 / 0560988875 </p>
+                                    <p>NIF: 298619280219028</p>
+                                    <p>RC: 15A0512508</p>
+                                    <p>N° Article: 19018372051</p>
                                 </div>
                                 <div class="client-info">
                                     <h4>Destinataire:</h4>
@@ -2236,13 +2544,13 @@
             <div id="printInvoiceContent">
                 <div class="print-header">
                     <div class="logo">
-                        <img src="logo.png" alt="Logo Imprimerie" 
+                        <img src="REM.png" alt="Logo Imprimerie" 
                              onerror="this.src='https://via.placeholder.com/100/3498db/ffffff?text=IP'">
                     </div>
-                    <h2>IMPRIMERIE PRO</h2>
+                    
                     <p>123 Rue d'Impression, Setif Centre, Algérie</p>
                     <p>Tél: 0660639631 | Email: Rymemballagemoderne@gmail.com</p>
-                    <p>NIF: <span id="printCompanyNif">123456789012345</span> | RC: <span id="printCompanyRc">RC123456789</span> | N° Article: <span id="printCompanyArticleNumber">ART987654321</span></p>
+                    <p>NIF: <span id="printCompanyNif">298619280219028</span> | RC: <span id="printCompanyRc">15A0512508</span> | N° Article: <span id="printCompanyArticleNumber">19018372051</span></p>
                 </div>
 
                 <div class="print-invoice-info">
@@ -2257,14 +2565,14 @@
                 <div class="print-details-grid">
                     <div class="print-company">
                         <h4>Émise par:</h4>
-                        <p><strong>IMPRIMERIE PRO</strong></p>
-                        <p>123 Rue d'Impression</p>
+                        <p><strong>REM</strong></p>
+                        <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
                         <p>Setif Centre, Algérie</p>
-                        <p>Tél: 0660639631</p>
+                        <p>Tél: 0660639631 / 0560988875</p>
                         <p>Email: Rymemballagemoderne@gmail.com</p>
-                        <p>NIF: <span id="printCompanyNif2">123456789012345</span></p>
-                        <p>RC: <span id="printCompanyRc2">RC123456789</span></p>
-                        <p>N° Article: <span id="printCompanyArticleNumber2">ART987654321</span></p>
+                        <p>NIF: <span id="printCompanyNif2">298619280219028</span></p>
+                        <p>RC: <span id="printCompanyRc2">15A0512508</span></p>
+                        <p>N° Article: <span id="printCompanyArticleNumber2">19018372051</span></p>
                     </div>
                     <div class="print-client">
                         <h4>Facturé à:</h4>
@@ -2365,10 +2673,9 @@
                         <img src="REM.jpg" alt="Logo Imprimerie" 
                              onerror="this.src='https://via.placeholder.com/100/2ecc71/ffffff?text=BL'">
                     </div>
-                    <h2>IMPRIMERIE PRO</h2>
-                    <p>123 Rue d'Impression, Alger Centre, Algérie</p>
-                    <p>Tél: 021 23 45 67 | Email: contact@imprimerie-pro.dz</p>
-                    <p>NIF: 123456789012345 | RC: RC123456789 | N° Article: ART987654321</p>
+                    <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                    <p>Tél: 0660639631 / 0560988875 | Email: contact@imprimerie-pro.dz</p>
+                    <p>NIF: 298619280219028 | RC: 15A0512508 | N° Article: 19018372051</p>
                 </div>
 
                 <div class="print-bl-info">
@@ -2383,13 +2690,12 @@
                 <div class="print-details-grid">
                     <div class="print-company">
                         <h4>Expéditeur:</h4>
-                        <p><strong>IMPRIMERIE PRO</strong></p>
-                        <p>123 Rue d'Impression</p>
-                        <p>Alger Centre, Algérie</p>
-                        <p>Tél: 021 23 45 67</p>
-                        <p>NIF: 123456789012345</p>
-                        <p>RC: RC123456789</p>
-                        <p>N° Article: ART987654321</p>
+                        <p><strong>REM</strong></p>
+                        <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
+                        <p>Tél: 0660639631 / 0560988875</p>
+                        <p>NIF: 298619280219028</p>
+                        <p>RC: 15A0512508</p>
+                        <p>N° Article: 19018372051</p>
                     </div>
                     <div class="print-client">
                         <h4>Destinataire:</h4>
