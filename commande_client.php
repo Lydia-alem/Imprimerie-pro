@@ -62,18 +62,25 @@ $items = $items_stmt->fetchAll();
 
 // Traitement du changement de statut
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
-    $new_status = $_POST['status'];
-    $new_deadline = $_POST['deadline'] ?? null;
-    
+    $new_status = $_POST['status'] ?? $order['status'];
+
+    // Important: convert empty deadline to NULL so MySQL strict mode accepts it
+    $raw_deadline = $_POST['deadline'] ?? '';
+    $new_deadline = trim($raw_deadline) !== '' ? $raw_deadline : null;
+
+    // Use prepared statement; passing null will store SQL NULL in deadline
     $update_stmt = $pdo->prepare("UPDATE orders SET status = ?, deadline = ? WHERE id = ?");
     $update_stmt->execute([$new_status, $new_deadline, $order_id]);
-    
-    // Ajouter une note d'historique
-    if (isset($_POST['status_note']) && !empty($_POST['status_note'])) {
+
+    // Ajouter une note d'historique (optionnel)
+    if (isset($_POST['status_note']) && !empty(trim($_POST['status_note']))) {
         // Vous pourriez créer une table order_history pour suivre les changements
+        // Exemple (non activé) :
+        // $noteStmt = $pdo->prepare("INSERT INTO order_history (order_id, note, created_at) VALUES (?, ?, NOW())");
+        // $noteStmt->execute([$order_id, trim($_POST['status_note'])]);
     }
-    
-    header("Location: commande_client.php?order_id=" . $order_id . "&updated=1");
+
+    header("Location: commande_client.php?order_id=" . urlencode($order_id) . "&updated=1");
     exit();
 }
 
@@ -86,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_invoice'])) {
     ");
     $invoice_stmt->execute([$order_id, $order['client_id'], $order['total']]);
     $invoice_id = $pdo->lastInsertId();
-    
+
     // Copier les articles de la commande vers la facture
     foreach ($items as $item) {
         $item_stmt = $pdo->prepare("
@@ -94,15 +101,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['create_invoice'])) {
             VALUES (?, ?, ?, ?, ?)
         ");
         $item_stmt->execute([
-            $invoice_id, 
-            $item['product_name'] . ($item['description'] ? ': ' . $item['description'] : ''), 
-            $item['quantity'], 
-            $item['price'], 
+            $invoice_id,
+            ($item['product_name'] ?: 'Article personnalisé') . ($item['description'] ? ': ' . $item['description'] : ''),
+            $item['quantity'],
+            $item['price'],
             $item['subtotal']
         ]);
     }
-    
-    header("Location: factures.php?invoice_created=" . $invoice_id);
+
+    header("Location: factures.php?invoice_created=" . urlencode($invoice_id));
     exit();
 }
 
@@ -115,7 +122,7 @@ function getStatusText($status) {
         'delivered' => 'Livrée',
         'cancelled' => 'Annulée'
     ];
-    
+
     return $statusMap[$status] ?? $status;
 }
 
@@ -142,7 +149,7 @@ function formatDate($date) {
     if (!$date) {
         return 'Non définie';
     }
-    
+
     return date('d/m/Y', strtotime($date));
 }
 
@@ -569,24 +576,24 @@ function formatAmount($amount) {
             .order-content {
                 padding: 20px;
             }
-            
+
             .info-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .action-buttons {
                 flex-direction: column;
             }
-            
+
             .form-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .timeline-steps {
                 flex-wrap: wrap;
                 gap: 20px;
             }
-            
+
             .timeline-step {
                 flex: 0 0 calc(50% - 10px);
             }
@@ -601,7 +608,7 @@ function formatAmount($amount) {
             <span class="order-status <?php echo getStatusClass($order['status']); ?>">
                 <?php echo getStatusText($order['status']); ?>
             </span>
-            
+
             <?php if (isset($_GET['order_created'])): ?>
             <div class="success-badge">
                 <i class="fas fa-check-circle"></i>
@@ -682,30 +689,30 @@ function formatAmount($amount) {
                         'ready' => 'Prête',
                         'delivered' => 'Livrée'
                     ];
-                    
-                    $currentStep = array_search($order['status'], array_keys($steps));
-                    $currentStep = $currentStep !== false ? $currentStep : 0;
-                    $stepIndex = 0;
-                    
-                    foreach ($steps as $key => $label):
+
+                    $keys = array_keys($steps);
+                    $currentIndex = array_search($order['status'], $keys);
+                    if ($currentIndex === false) $currentIndex = 0;
+
+                    foreach ($steps as $idx => $label):
+                        // compute numeric index for display
+                        $numericIndex = array_search($idx, $keys);
                     ?>
                     <div class="timeline-step">
-                        <div class="step-circle 
-                            <?php echo $stepIndex < $currentStep ? 'completed' : ''; ?>
-                            <?php echo $stepIndex == $currentStep ? 'active' : ''; ?>">
-                            <?php echo $stepIndex + 1; ?>
+                        <div class="step-circle <?php echo ($numericIndex < $currentIndex ? 'completed' : '') . ' ' . ($numericIndex == $currentIndex ? 'active' : ''); ?>">
+                            <?php echo $numericIndex + 1; ?>
                         </div>
-                        <div class="step-label <?php echo $stepIndex == $currentStep ? 'active' : ''; ?>">
+                        <div class="step-label <?php echo $numericIndex == $currentIndex ? 'active' : ''; ?>">
                             <?php echo $label; ?>
                         </div>
                     </div>
-                    <?php $stepIndex++; endforeach; ?>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
             <div class="order-details">
                 <h3><i class="fas fa-list"></i> Détail de la commande</h3>
-                
+
                 <?php if (empty($items)): ?>
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
@@ -762,17 +769,17 @@ function formatAmount($amount) {
                     <a href="devis.php" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Retour aux devis
                     </a>
-                    
+
                     <a href="commande.php" class="btn btn-secondary">
                         <i class="fas fa-list"></i> Voir toutes les commandes
                     </a>
-                    
+
                     <form method="POST" style="display: inline;">
                         <button type="submit" name="create_invoice" class="btn btn-success" onclick="return confirm('Créer une facture pour cette commande ?')">
                             <i class="fas fa-file-invoice-dollar"></i> Créer une facture
                         </button>
                     </form>
-                    
+
                     <button onclick="window.print()" class="btn btn-primary">
                         <i class="fas fa-print"></i> Imprimer la commande
                     </button>
@@ -792,19 +799,19 @@ function formatAmount($amount) {
                                     <option value="cancelled" <?php echo $order['status'] == 'cancelled' ? 'selected' : ''; ?>>Annulée</option>
                                 </select>
                             </div>
-                            
+
                             <div class="form-group">
                                 <label class="form-label">Date limite :</label>
-                                <input type="date" name="deadline" class="form-control" 
+                                <input type="date" name="deadline" class="form-control"
                                        value="<?php echo $order['deadline'] ? date('Y-m-d', strtotime($order['deadline'])) : ''; ?>">
                             </div>
                         </div>
-                        
+
                         <div class="form-group">
                             <label class="form-label">Note (optionnelle) :</label>
                             <textarea name="status_note" class="form-control" rows="3" placeholder="Ajouter une note sur le changement de statut..."></textarea>
                         </div>
-                        
+
                         <button type="submit" name="update_status" class="btn btn-primary">
                             <i class="fas fa-save"></i> Mettre à jour la commande
                         </button>
@@ -819,7 +826,7 @@ function formatAmount($amount) {
         function updateTimeline() {
             // Cette fonction pourrait être utilisée pour des mises à jour dynamiques
         }
-        
+
         // Confirmation pour annuler une commande
         function confirmCancel() {
             if (confirm("Êtes-vous sûr de vouloir annuler cette commande ? Cette action est irréversible.")) {

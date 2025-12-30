@@ -48,7 +48,7 @@ $pdo->exec("
     )
 ");
 
-// Insert default categories if not exist
+// Default categories (used when table is empty)
 $defaultCategories = [
     'Loyer',
     'Électricité',
@@ -71,16 +71,6 @@ $defaultCategories = [
     'Services',
     'Divers'
 ];
-
-// Function to insert categories
-foreach ($defaultCategories as $category) {
-    // Check if category exists in expenses
-    $stmt = $pdo->prepare("SELECT COUNT(*) as count FROM general_depenses WHERE categorie = ? LIMIT 1");
-    $stmt->execute([$category]);
-    $result = $stmt->fetch();
-    
-    // We'll use a different approach - just ensure categories are available for dropdown
-}
 
 // Fetch expense statistics
 function getExpenseStats($pdo, $month = null) {
@@ -146,12 +136,12 @@ function getExpenseStats($pdo, $month = null) {
 
 // Fetch all unique categories
 function getAllCategories($pdo) {
+    global $defaultCategories;
     $stmt = $pdo->query("SELECT DISTINCT categorie FROM general_depenses ORDER BY categorie");
     $categories = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
     
     // If no categories yet, return default ones
     if (empty($categories)) {
-        global $defaultCategories;
         return $defaultCategories;
     }
     
@@ -215,7 +205,51 @@ function generateExpenseNumber($pdo) {
     return "DEP-$year$month-" . str_pad($count, 4, '0', STR_PAD_LEFT);
 }
 
-// Get all data
+// If the request is an AJAX request for expense details, return an HTML fragment
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_depense_details'])) {
+    $depenseId = (int) $_GET['get_depense_details'];
+    $stmt = $pdo->prepare("SELECT * FROM general_depenses WHERE id = ?");
+    $stmt->execute([$depenseId]);
+    $dep = $stmt->fetch();
+
+    if (!$dep) {
+        echo '<div style="padding:15px;"><div class="alert alert-warning">Dépense introuvable.</div></div>';
+        exit();
+    }
+
+    // Build HTML fragment
+    ob_start();
+    ?>
+    <div style="padding:10px;">
+        <h3>Dépense <?php echo htmlspecialchars($dep['numero'] ?: ''); ?></h3>
+        <p><strong>Titre:</strong> <?php echo htmlspecialchars($dep['titre']); ?></p>
+        <p><strong>Catégorie:</strong> <?php echo htmlspecialchars($dep['categorie']); ?></p>
+        <p><strong>Montant:</strong> <?php echo formatCurrency($dep['montant']); ?></p>
+        <p><strong>Date de dépense:</strong> <?php echo date('d/m/Y', strtotime($dep['date_depense'])); ?></p>
+        <p><strong>Mode de paiement:</strong> <?php echo htmlspecialchars(ucfirst($dep['mode_paiement'])); ?></p>
+        <?php if (!empty($dep['beneficiaire'])): ?>
+            <p><strong>Bénéficiaire:</strong> <?php echo htmlspecialchars($dep['beneficiaire']); ?></p>
+        <?php endif; ?>
+        <p><strong>Enregistrée le:</strong> <?php echo date('d/m/Y H:i', strtotime($dep['created_at'])); ?></p>
+        <?php if (!empty($dep['description'])): ?>
+            <hr>
+            <h4>Description</h4>
+            <div style="white-space:pre-wrap; color:#333;"><?php echo nl2br(htmlspecialchars($dep['description'])); ?></div>
+        <?php endif; ?>
+
+        <?php if (!empty($dep['notes'])): ?>
+            <hr>
+            <h4>Notes</h4>
+            <div style="white-space:pre-wrap; color:#333;"><?php echo nl2br(htmlspecialchars($dep['notes'])); ?></div>
+        <?php endif; ?>
+    </div>
+    <?php
+    $html = ob_get_clean();
+    echo $html;
+    exit();
+}
+
+// Get all data for page rendering
 if ($isLoggedIn) {
     $expenseStats = getExpenseStats($pdo, $filterMonth !== 'all' ? $filterMonth : null);
     $categories = getAllCategories($pdo);
@@ -289,7 +323,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -890,6 +923,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             font-size: 0.9rem;
             color: #666;
         }
+        .modal .modal-content h3 { margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -1044,7 +1078,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <div class="amount"><?php echo formatCurrency($expenseStats['this_month']); ?></div>
                     <?php if ($expenseStats['last_month'] > 0): ?>
                     <small><?php echo ($expenseStats['this_month'] > $expenseStats['last_month'] ? '+' : '-'); ?>
-                        <?php echo number_format(abs(($expenseStats['this_month'] - $expenseStats['last_month']) / $expenseStats['last_month'] * 100), 1); ?>% vs mois dernier
+                        <?php echo number_format(abs(($expenseStats['this_month'] - $expenseStats['last_month']) / ($expenseStats['last_month'] ?: 1) * 100), 1); ?>% vs mois dernier
                     </small>
                     <?php endif; ?>
                 </div>
@@ -1341,6 +1375,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         </div>
     </div>
 
+    <!-- Expense Details Modal -->
+    <div id="depenseDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Détails de la dépense</h3>
+                <button class="close-modal" onclick="closeDepenseDetailsModal()">&times;</button>
+            </div>
+            <div id="depenseDetailsContent" style="padding:10px;">
+                <!-- content loaded by AJAX -->
+            </div>
+        </div>
+    </div>
+
     <script>
         // Modal functions
         function openNewDepenseModal() {
@@ -1367,14 +1414,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             document.getElementById('deleteModal').style.display = 'none';
         }
 
+        function closeDepenseDetailsModal() {
+            document.getElementById('depenseDetailsModal').style.display = 'none';
+        }
+
         // Reset filters
         function resetFilters() {
             window.location.href = window.location.pathname;
         }
 
-        // View details (placeholder)
+        // View details (AJAX)
         function viewDetails(depenseId) {
-            alert('Détails de la dépense #' + depenseId + '\n\nCette fonctionnalité affichera tous les détails de la dépense.');
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'depenses.php?get_depense_details=' + encodeURIComponent(depenseId), true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('depenseDetailsContent').innerHTML = xhr.responseText;
+                    document.getElementById('depenseDetailsModal').style.display = 'flex';
+                } else {
+                    document.getElementById('depenseDetailsContent').innerHTML = '<div class="alert alert-danger">Erreur lors du chargement des détails.</div>';
+                    document.getElementById('depenseDetailsModal').style.display = 'flex';
+                }
+            };
+            xhr.onerror = function() {
+                document.getElementById('depenseDetailsContent').innerHTML = '<div class="alert alert-danger">Erreur réseau.</div>';
+                document.getElementById('depenseDetailsModal').style.display = 'flex';
+            };
+            xhr.send();
         }
 
         // Confirm delete
@@ -1398,22 +1464,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         // Close modal when clicking outside
-        document.getElementById('newDepenseModal')?.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeNewDepenseModal();
-            }
-        });
-
-        document.getElementById('newCategoryModal')?.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeNewCategoryModal();
-            }
-        });
-
-        document.getElementById('deleteModal')?.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeDeleteModal();
-            }
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
         });
 
         // Auto-format amount input
@@ -1421,48 +1477,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             const amountInput = document.getElementById('montant');
             if (amountInput) {
                 amountInput.addEventListener('blur', function() {
+                    if (this.value === '') return;
                     this.value = parseFloat(this.value).toFixed(2);
                 });
             }
             
-            // Allow typing new categories in select
+            // Allow typing new categories in select (basic)
             const categorySelect = document.getElementById('categorie');
             if (categorySelect) {
-                let typingTimer;
-                const doneTypingInterval = 1000;
-                
-                categorySelect.addEventListener('input', function() {
-                    clearTimeout(typingTimer);
-                    typingTimer = setTimeout(() => {
-                        const value = this.value.trim();
-                        if (value && !Array.from(this.options).some(opt => opt.value === value)) {
-                            // Create new option
-                            const newOption = document.createElement('option');
-                            newOption.value = value;
-                            newOption.textContent = value + ' (Nouveau)';
-                            this.appendChild(newOption);
-                            this.value = value;
-                            
-                            // Show message
-                            const message = document.createElement('small');
-                            message.style.color = 'green';
-                            message.style.display = 'block';
-                            message.textContent = 'Nouvelle catégorie sera créée';
-                            
-                            const existingMsg = this.parentNode.querySelector('.new-category-msg');
-                            if (existingMsg) {
-                                existingMsg.remove();
-                            }
-                            
-                            message.className = 'new-category-msg';
-                            this.parentNode.appendChild(message);
-                        }
-                    }, doneTypingInterval);
+                categorySelect.addEventListener('change', function() {
+                    // if option text contains "(Nouveau)" leave as-is
                 });
             }
             
             // Set today's date by default
-            if (!document.getElementById('date_depense')?.value) {
+            if (document.getElementById('date_depense') && !document.getElementById('date_depense').value) {
                 document.getElementById('date_depense').value = new Date().toISOString().split('T')[0];
             }
         });

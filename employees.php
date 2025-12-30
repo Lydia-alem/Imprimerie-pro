@@ -283,599 +283,69 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
             --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
-            background-color: #f5f7fa;
-            color: var(--dark);
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 250px;
-            background: var(--primary);
-            color: white;
-            transition: all 0.3s;
-            box-shadow: var(--shadow);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar-header {
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .sidebar-header i {
-            font-size: 2rem;
-        }
-
-        .sidebar-header h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .sidebar-menu {
-            padding: 15px 0;
-            flex: 1;
-        }
-
-        .sidebar-menu ul {
-            list-style: none;
-        }
-
-        .sidebar-menu li {
-            transition: all 0.3s;
-        }
-
-        .sidebar-menu li a {
-            padding: 12px 20px;
-            display: flex;
-            align-items: center;
-            color: white;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .sidebar-menu li a:hover {
-            background: rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-        }
-
-        .sidebar-menu li.active a {
-            background: var(--secondary);
-            border-left: 4px solid var(--accent);
-        }
-
-        .sidebar-menu i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-
-        .sidebar-footer {
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .user-details h4 {
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-        }
-
-        .user-details span {
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        /* Main Content Styles */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-        }
-
-        /* Header Styles */
-        .header {
-            background: white;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: var(--shadow);
-        }
-
-        .header-left h1 {
-            font-size: 1.8rem;
-            color: var(--primary);
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .search-bar {
-            position: relative;
-        }
-
-        .search-bar input {
-            padding: 10px 15px 10px 40px;
-            border: 1px solid var(--gray);
-            border-radius: 30px;
-            width: 300px;
-            outline: none;
-            transition: all 0.3s;
-        }
-
-        .search-bar input:focus {
-            border-color: var(--secondary);
-        }
-
-        .search-bar i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--gray);
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-
-        .user-profile img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        /* Content Styles */
-        .content {
-            padding: 30px;
-            flex: 1;
-        }
-
-        /* Page Header */
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        .page-title h2 {
-            font-size: 1.8rem;
-            color: var(--primary);
-        }
-
-        .page-title p {
-            color: var(--gray);
-            margin-top: 5px;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-
-        /* Form Card */
-        .form-card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: var(--shadow);
-            margin-bottom: 30px;
-        }
-
-        .form-card h3 {
-            font-size: 1.3rem;
-            color: var(--primary);
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .form-group label {
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--dark);
-        }
-
-        .form-group input, .form-group select {
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: var(--secondary);
-            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
-        }
-
-        .form-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 15px;
-            margin-top: 25px;
-        }
-
-        .btn-secondary {
-            background: var(--gray);
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: #7f8c8d;
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #27ae60;
-        }
-
-        /* Employees Table */
-        .employees-card {
-            background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: var(--shadow);
-        }
-
-        .employees-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-
-        .employees-header h3 {
-            font-size: 1.3rem;
-            color: var(--primary);
-        }
-
-        .employees-actions {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn-outline {
-            background: transparent;
-            color: var(--secondary);
-            border: 1px solid var(--secondary);
-        }
-
-        .btn-outline:hover {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #c0392b;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        th {
-            color: var(--gray);
-            font-weight: 500;
-            background: #f8f9fa;
-        }
-
-        .employee-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .employee-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .employee-name {
-            font-weight: 500;
-            color: var(--dark);
-        }
-
-        .employee-email {
-            font-size: 0.9rem;
-            color: var(--gray);
-        }
-
-        .department {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        .department-printing {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .department-design {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .department-finance {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .department-sales {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .department-admin {
-            background: #e2e3e5;
-            color: #383d41;
-        }
-
-        .salary {
-            font-weight: 600;
-            color: var(--dark);
-        }
-
-        .salary::after {
-            content: " €";
-        }
-
-        .actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border: none;
-            transition: all 0.3s;
-        }
-
-        .btn-edit {
-            background: rgba(52, 152, 219, 0.1);
-            color: var(--secondary);
-        }
-
-        .btn-edit:hover {
-            background: var(--secondary);
-            color: white;
-        }
-
-        .btn-delete {
-            background: rgba(231, 76, 60, 0.1);
-            color: var(--danger);
-        }
-
-        .btn-delete:hover {
-            background: var(--danger);
-            color: white;
-        }
-
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--gray);
-        }
-
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 15px;
-            color: #ddd;
-        }
-
-        /* Messages */
-        .alert {
-            padding: 12px 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .close-alert {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            color: inherit;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 992px) {
-            .sidebar {
-                width: 80px;
-            }
-            
-            .sidebar-header h2, .sidebar-menu span {
-                display: none;
-            }
-            
-            .sidebar-header i {
-                font-size: 1.5rem;
-                margin: 0 auto;
-            }
-            
-            .sidebar-menu li a {
-                padding: 15px 10px;
-                justify-content: center;
-            }
-            
-            .sidebar-menu i {
-                margin-right: 0;
-                font-size: 1.2rem;
-            }
-            
-            .sidebar-footer .user-details {
-                display: none;
-            }
-            
-            .user-info {
-                justify-content: center;
-            }
-            
-            .table-container {
-                overflow-x: auto;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .search-bar input {
-                width: 200px;
-            }
-            
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-            
-            .employees-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-            
-            .employees-actions {
-                width: 100%;
-                justify-content: space-between;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .search-bar {
-                display: none;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .header {
-                padding: 15px;
-            }
-            
-            .content {
-                padding: 15px;
-            }
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f5f7fa; color: var(--dark); display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar { width: 250px; background: var(--primary); color: white; box-shadow: var(--shadow); display:flex; flex-direction:column; }
+        .sidebar-header { padding: 20px; display:flex; align-items:center; gap:15px; }
+        .sidebar-header i { font-size: 1.4rem; }
+        .sidebar-header h2 { font-size:1.2rem; }
+        .sidebar-menu { padding: 15px 0; flex:1; }
+        .sidebar-menu ul { list-style:none; }
+        .sidebar-menu li a { padding:12px 20px; display:flex; align-items:center; color:white; text-decoration:none; }
+        .sidebar-menu li.active a { background: var(--secondary); border-left: 4px solid var(--accent); }
+
+        .main-content { flex:1; display:flex; flex-direction:column; overflow-x:hidden; }
+
+        .header { background:white; padding:15px 30px; display:flex; justify-content:space-between; align-items:center; box-shadow: var(--shadow); }
+        .header-left h1 { font-size:1.6rem; color:var(--primary); }
+        .header-right { display:flex; align-items:center; gap:20px; }
+
+        .search-bar { position:relative; }
+        .search-bar input { padding:10px 15px 10px 40px; border:1px solid var(--gray); border-radius:30px; width:300px; }
+        .search-bar i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--gray); }
+
+        .content { padding:30px; flex:1; }
+
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .page-title h2 { font-size:1.4rem; color:var(--primary); }
+        .btn { padding:10px 18px; border:none; border-radius:5px; cursor:pointer; font-weight:500; display:inline-flex; align-items:center; gap:8px; }
+        .btn-primary { background:var(--secondary); color:white; }
+
+        .form-card { background:white; border-radius:10px; padding:20px; box-shadow:var(--shadow); margin-bottom:20px; display:none; }
+        .form-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:10px; }
+        .form-group label { margin-bottom:6px; font-weight:600; color:var(--dark); display:block; }
+        .form-group input, .form-group select { padding:10px 12px; border:1px solid #ddd; border-radius:6px; width:100%; }
+
+        .employees-card { background:white; border-radius:10px; padding:20px; box-shadow:var(--shadow); }
+        .employees-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; }
+        table { width:100%; border-collapse:collapse; }
+        th, td { padding:12px 10px; text-align:left; border-bottom:1px solid #eee; }
+        th { background:#f8f9fa; color:var(--gray); }
+        .department { padding:6px 10px; border-radius:14px; font-weight:600; font-size:0.85rem; display:inline-block; }
+        .department-printing { background:#d1ecf1; color:#0c5460; }
+        .department-design { background:#d4edda; color:#155724; }
+        .department-sales { background:#fff3cd; color:#856404; }
+        .department-finance { background:#f8d7da; color:#721c24; }
+        .department-admin { background:#e2e3e5; color:#383d41; }
+
+        /* salary shown with DA suffix in markup */
+        .salary { font-weight:600; color:var(--dark); }
+
+        .actions { display:flex; gap:8px; align-items:center; }
+        .btn-icon { width:36px; height:36px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; border:none; cursor:pointer; }
+        .btn-edit { background:rgba(52,152,219,0.08); color:var(--secondary); }
+        .btn-delete { background:rgba(231,76,60,0.08); color:var(--danger); }
+
+        .empty-state { text-align:center; padding:30px; color:var(--gray); }
+
+        .alert { padding:10px 14px; border-radius:6px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+        .alert-success { background:#d4edda; color:#155724; border:1px solid #c3e6cb; }
+        .alert-error { background:#f8d7da; color:#721c24; border:1px solid #f5c6cb; }
+
+        @media (max-width:992px) { .sidebar { width:80px; } .search-bar input { width:180px; } .main-content { margin-left:80px; } }
+        @media (max-width:576px) { .search-bar { display:none; } .form-row { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
@@ -887,95 +357,47 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         </div>
         <div class="sidebar-menu">
             <ul>
-                <li>
-                    <a href="dashboard.php">
-                        <i class="fas fa-home"></i>
-                        <span>Tableau de Bord</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="ajustestock.php">
-                        <i class="fas fa-box"></i>
-                        <span>Stock</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="gestion.php">
-                        <i class="fas fa-users"></i>
-                        <span>Gestion</span>
-                    </a>
-                </li>
-                <li class="active">
-                    <a href="employees.php">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Employés</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="facture.php">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>Facturation</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="profile.php">
-                        <i class="fas fa-user"></i>
-                        <span>Mon Profil</span>
-                    </a>
-                </li>
+                <li><a href="dashboard.php"><i class="fas fa-home"></i><span style="margin-left:8px">Tableau de Bord</span></a></li>
+                <li><a href="ajustestock.php"><i class="fas fa-box"></i><span style="margin-left:8px">Stock</span></a></li>
+                <li><a href="gestion.php"><i class="fas fa-users"></i><span style="margin-left:8px">Gestion</span></a></li>
+                <li class="active"><a href="employees.php"><i class="fas fa-user-tie"></i><span style="margin-left:8px">Employés</span></a></li>
+                <li><a href="facture.php"><i class="fas fa-file-invoice-dollar"></i><span style="margin-left:8px">Facturation</span></a></li>
+                <li><a href="profile.php"><i class="fas fa-user"></i><span style="margin-left:8px">Mon Profil</span></a></li>
             </ul>
-        </div>
-        <div class="sidebar-footer">
-            <div class="user-info">
-                <img src="" alt="Admin" class="user-avatar">
-                <div class="user-details">
-                    <h4>Administrateur</h4>
-                    <span>Super Admin</span>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-        <!-- Header -->
         <div class="header">
-            <div class="header-left">
-                <h1>Gestion des Employés</h1>
-            </div>
+            <div class="header-left"><h1>Gestion des Employés</h1></div>
             <div class="header-right">
                 <div class="search-bar">
                     <i class="fas fa-search"></i>
                     <input type="text" id="searchInput" placeholder="Rechercher un employé...">
                 </div>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin" style="width:36px;height:36px;border-radius:50%;">
                     <span>Admin</span>
                 </div>
             </div>
         </div>
 
-        <!-- Content -->
         <div class="content">
             <!-- Messages -->
             <?php if ($message): ?>
-            <div class="alert alert-<?php echo $messageType === 'success' ? 'success' : 'error'; ?>" id="messageAlert">
+            <div class="alert <?php echo $messageType === 'success' ? 'alert-success' : 'alert-error'; ?>" id="messageAlert">
                 <?php echo htmlspecialchars($message); ?>
-                <button class="close-alert" onclick="document.getElementById('messageAlert').style.display='none'">
-                    &times;
-                </button>
+                <button class="close-alert" onclick="document.getElementById('messageAlert').style.display='none'">&times;</button>
             </div>
             <?php endif; ?>
-            
-            <!-- Page Header -->
+
             <div class="page-header">
                 <div class="page-title">
                     <h2>Gestion du personnel</h2>
                     <p>Ajoutez, modifiez ou supprimez des employés et gérez leurs salaires</p>
                 </div>
-                <button class="btn btn-primary" id="addEmployeeBtn" onclick="showAddForm()">
-                    <i class="fas fa-plus"></i> Ajouter un employé
-                </button>
+                <button class="btn btn-primary" id="addEmployeeBtn" onclick="showAddForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
             </div>
 
             <!-- Form Card -->
@@ -1016,14 +438,14 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                             <select id="department" name="department" required>
                                 <option value="">Sélectionnez...</option>
                                 <option value="printing" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'printing') ? 'selected' : ''; ?>>Impression</option>
-                                <option value="design" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'design') ? 'selected' : ''; ?>>Design & Conception</option>
+                                <option value="design" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'design') ? 'selected' : ''; ?>>Design</option>
                                 <option value="sales" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'sales') ? 'selected' : ''; ?>>Ventes</option>
-                                <option value="finance" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'finance') ? 'selected' : ''; ?>>Finance & Comptabilité</option>
+                                <option value="finance" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'finance') ? 'selected' : ''; ?>>Finance</option>
                                 <option value="admin" <?php echo ($isEditing && $currentEmployee && isset($currentEmployee['department']) && $currentEmployee['department'] == 'admin') ? 'selected' : ''; ?>>Administration</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="salary">Salaire mensuel (€) *</label>
+                            <label for="salary">Salaire mensuel (DA) *</label>
                             <input type="number" id="salary" name="salary" min="0" step="50" required
                                    value="<?php echo $isEditing && $currentEmployee && isset($currentEmployee['salary']) ? htmlspecialchars($currentEmployee['salary']) : '2500'; ?>">
                         </div>
@@ -1040,18 +462,12 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                             <input type="tel" id="phone" name="phone"
                                    value="<?php echo $isEditing && $currentEmployee && isset($currentEmployee['phone']) ? htmlspecialchars($currentEmployee['phone']) : ''; ?>">
                         </div>
-                        <div class="form-group">
-                            <!-- Empty column for alignment -->
-                        </div>
+                        <div class="form-group"></div>
                     </div>
                     
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary" onclick="hideForm()">
-                            Annuler
-                        </button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="fas fa-save"></i> <?php echo $isEditing ? 'Mettre à jour' : 'Enregistrer'; ?>
-                        </button>
+                    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                        <button type="button" class="btn" onclick="hideForm()">Annuler</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> <?php echo $isEditing ? 'Mettre à jour' : 'Enregistrer'; ?></button>
                     </div>
                 </form>
             </div>
@@ -1060,13 +476,11 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
             <div class="employees-card">
                 <div class="employees-header">
                     <h3>Liste des employés</h3>
-                    <div class="employees-actions">
-                        <!-- You can add export or filter buttons here if needed -->
-                    </div>
+                    <div class="employees-actions"></div>
                 </div>
                 
                 <div class="table-container">
-                    <table id="employeesTable">
+                    <table id="employeesTable" aria-describedby="employeesList">
                         <thead>
                             <tr>
                                 <th>Employé</th>
@@ -1079,10 +493,10 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                         </thead>
                         <tbody id="employeesList">
                             <?php if (empty($employees)): ?>
-                            <tr>
+                            <tr class="no-results">
                                 <td colspan="6">
                                     <div class="empty-state">
-                                        <i class="fas fa-user-friends"></i>
+                                        <i class="fas fa-user-friends" style="font-size:2rem;"></i>
                                         <h3>Aucun employé trouvé</h3>
                                         <p>Cliquez sur "Ajouter un employé" pour commencer</p>
                                     </div>
@@ -1091,68 +505,42 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                             <?php else: ?>
                                 <?php foreach ($employees as $employee): ?>
                                 <?php
-                                // Formater la date d'embauche
-                                $hireDate = isset($employee['hire_date']) ? date('d/m/Y', strtotime($employee['hire_date'])) : 
-                                           (isset($employee['created_at']) ? date('d/m/Y', strtotime($employee['created_at'])) : 'N/A');
-                                
-                                // Déterminer la classe CSS pour le département
-                                $deptClass = '';
-                                $deptText = '';
+                                $hireDate = isset($employee['hire_date']) && $employee['hire_date'] ? date('d/m/Y', strtotime($employee['hire_date'])) : (isset($employee['created_at']) ? date('d/m/Y', strtotime($employee['created_at'])) : 'N/A');
                                 $department = $employee['department'] ?? '';
-                                
+                                $deptClass = 'department-admin';
+                                $deptText = 'Non défini';
                                 switch($department) {
-                                    case 'printing':
-                                        $deptClass = 'department-printing';
-                                        $deptText = 'Impression';
-                                        break;
-                                    case 'design':
-                                        $deptClass = 'department-design';
-                                        $deptText = 'Design';
-                                        break;
-                                    case 'sales':
-                                        $deptClass = 'department-sales';
-                                        $deptText = 'Ventes';
-                                        break;
-                                    case 'finance':
-                                        $deptClass = 'department-finance';
-                                        $deptText = 'Finance';
-                                        break;
-                                    case 'admin':
-                                        $deptClass = 'department-admin';
-                                        $deptText = 'Administration';
-                                        break;
-                                    default:
-                                        $deptClass = 'department-admin';
-                                        $deptText = 'Non défini';
+                                    case 'printing': $deptClass = 'department-printing'; $deptText = 'Impression'; break;
+                                    case 'design': $deptClass = 'department-design'; $deptText = 'Design'; break;
+                                    case 'sales': $deptClass = 'department-sales'; $deptText = 'Ventes'; break;
+                                    case 'finance': $deptClass = 'department-finance'; $deptText = 'Finance'; break;
+                                    case 'admin': $deptClass = 'department-admin'; $deptText = 'Administration'; break;
                                 }
-                                
-                                // Salaire
                                 $salary = $employee['salary'] ?? 0;
                                 ?>
-                                <tr>
+                                <tr data-name="<?php echo htmlspecialchars(strtolower($employee['full_name'])); ?>"
+                                    data-email="<?php echo htmlspecialchars(strtolower($employee['email'])); ?>"
+                                    data-position="<?php echo htmlspecialchars(strtolower($employee['position'] ?? '')); ?>"
+                                    data-department="<?php echo htmlspecialchars(strtolower($deptText)); ?>">
                                     <td>
-                                        <div class="employee-info">
+                                        <div style="display:flex; gap:10px; align-items:center;">
                                             <div>
-                                                <div class="employee-name"><?php echo htmlspecialchars($employee['full_name']); ?></div>
-                                                <div class="employee-email"><?php echo htmlspecialchars($employee['email']); ?></div>
+                                                <div style="font-weight:600;"><?php echo htmlspecialchars($employee['full_name']); ?></div>
+                                                <div style="color:var(--gray); font-size:0.9rem;"><?php echo htmlspecialchars($employee['email']); ?></div>
                                             </div>
                                         </div>
                                     </td>
                                     <td><?php echo htmlspecialchars($employee['position'] ?? 'Non défini'); ?></td>
                                     <td><span class="department <?php echo $deptClass; ?>"><?php echo $deptText; ?></span></td>
                                     <td><?php echo $hireDate; ?></td>
-                                    <td class="salary"><?php echo number_format($salary, 0, ',', ' '); ?></td>
+                                    <td class="salary"><?php echo number_format($salary, 0, ',', ' '); ?> DA</td>
                                     <td>
                                         <div class="actions">
-                                            <button class="btn-icon btn-edit" onclick="editEmployee(<?php echo $employee['id']; ?>)">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <form method="POST" style="display: inline;" onsubmit="return confirmDelete()">
+                                            <button class="btn-icon btn-edit" title="Modifier" onclick="editEmployee(<?php echo $employee['id']; ?>)"><i class="fas fa-edit"></i></button>
+                                            <form method="POST" style="display:inline;" onsubmit="return confirmDelete()">
                                                 <input type="hidden" name="action" value="delete">
                                                 <input type="hidden" name="employee_id" value="<?php echo $employee['id']; ?>">
-                                                <button type="submit" class="btn-icon btn-delete">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
+                                                <button type="submit" class="btn-icon btn-delete" title="Supprimer"><i class="fas fa-trash"></i></button>
                                             </form>
                                         </div>
                                     </td>
@@ -1166,97 +554,88 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
         </div>
     </div>
 
-    <script>
-        // Variables pour la gestion du formulaire
-        let isEditing = false;
-        let currentEmployeeId = null;
+<script>
+    // Form handling
+    function showAddForm(){
+        document.getElementById('employeeForm').style.display = 'block';
+        document.getElementById('formTitle').textContent = 'Ajouter un nouvel employé';
+        const form = document.getElementById('employeeFormData');
+        form.reset();
+        form.querySelector('input[name="action"]').value = 'add';
+        // remove employee_id if present
+        const idInput = form.querySelector('input[name="employee_id"]');
+        if (idInput) idInput.remove();
+        document.getElementById('hireDate').value = new Date().toISOString().split('T')[0];
+        window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function hideForm(){
+        document.getElementById('employeeForm').style.display = 'none';
+        // reload to clear edit state if any
+        if (location.search.indexOf('edit=') !== -1) {
+            window.location.href = window.location.pathname;
+        }
+    }
+    function editEmployee(id){
+        // simply navigate to ?edit=id (server will populate the form)
+        window.location.href = '?edit=' + id;
+    }
+    function confirmDelete(){
+        return confirm("Êtes-vous sûr de vouloir supprimer cet employé ?");
+    }
 
-        // Éléments DOM
-        const employeeForm = document.getElementById('employeeForm');
+    // Search functionality - client side, real-time
+    document.addEventListener('DOMContentLoaded', function(){
         const searchInput = document.getElementById('searchInput');
-        const employeesTable = document.getElementById('employeesTable');
+        const tbody = document.querySelector('#employeesList');
+        if (!tbody) return;
 
-        // Afficher le formulaire d'ajout
-        function showAddForm() {
-            employeeForm.style.display = 'block';
-            document.getElementById('formTitle').textContent = "Ajouter un nouvel employé";
-            
-            // Réinitialiser le formulaire
-            const form = document.getElementById('employeeFormData');
-            form.reset();
-            
-            // Définir la date d'aujourd'hui comme valeur par défaut
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('hireDate').value = today;
-            
-            // Définir l'action comme "add"
-            const actionInput = form.querySelector('input[name="action"]');
-            if (actionInput) {
-                actionInput.value = 'add';
-            }
-            
-            // Supprimer l'ID d'employé s'il existe
-            const employeeIdInput = form.querySelector('input[name="employee_id"]');
-            if (employeeIdInput) {
-                employeeIdInput.remove();
-            }
-            
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Éditer un employé
-        function editEmployee(employeeId) {
-            window.location.href = '?edit=' + employeeId;
-        }
-
-        // Cacher le formulaire
-        function hideForm() {
-            employeeForm.style.display = 'none';
-            window.location.href = window.location.pathname; // Retour à la page sans paramètres
-        }
-
-        // Confirmer la suppression
-        function confirmDelete() {
-            return confirm("Êtes-vous sûr de vouloir supprimer cet employé ?");
-        }
-
-        // Filtrer les employés
-        function filterEmployees() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const rows = employeesTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-            
-            for (let i = 0; i < rows.length; i++) {
-                const row = rows[i];
-                const cells = row.getElementsByTagName('td');
-                let found = false;
-                
-                for (let j = 0; j < cells.length; j++) {
-                    const cellText = cells[j].textContent.toLowerCase();
-                    if (cellText.includes(searchTerm)) {
-                        found = true;
-                        break;
-                    }
+        function updateEmptyState(visibleCount){
+            // show/hide the no-results row
+            const noResultsRow = tbody.querySelector('.no-results');
+            if (visibleCount === 0) {
+                if (!noResultsRow) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'no-results';
+                    tr.innerHTML = '<td colspan="6"><div class="empty-state"><i class="fas fa-user-friends" style="font-size:2rem;"></i><h3>Aucun employé trouvé</h3><p>Essayez un autre terme de recherche.</p></div></td>';
+                    tbody.appendChild(tr);
                 }
-                
-                row.style.display = found ? '' : 'none';
+            } else {
+                if (noResultsRow) noResultsRow.remove();
             }
         }
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', function() {
-            // Ajouter l'événement de recherche
-            if (searchInput) {
-                searchInput.addEventListener('input', filterEmployees);
-            }
-            
-            // Masquer le message après 5 secondes
-            const messageAlert = document.getElementById('messageAlert');
-            if (messageAlert) {
-                setTimeout(() => {
-                    messageAlert.style.display = 'none';
-                }, 5000);
-            }
-        });
-    </script>
+        function filterEmployees(){
+            const term = searchInput.value.trim().toLowerCase();
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('no-results'));
+            let visible = 0;
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name') || '';
+                const email = row.getAttribute('data-email') || '';
+                const position = row.getAttribute('data-position') || '';
+                const department = row.getAttribute('data-department') || '';
+                const salaryCell = row.querySelector('.salary') ? row.querySelector('.salary').textContent.toLowerCase() : '';
+
+                const hay = [name, email, position, department, salaryCell].join(' ');
+                if (hay.indexOf(term) !== -1) {
+                    row.style.display = '';
+                    visible++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            updateEmptyState(visible);
+        }
+
+        searchInput.addEventListener('input', filterEmployees);
+        // init: if there is a value already (e.g. mobile keyboard), run filter
+        if (searchInput.value.trim() !== '') filterEmployees();
+
+        // Auto-hide messages
+        const messageAlert = document.getElementById('messageAlert');
+        if (messageAlert) {
+            setTimeout(()=>{ messageAlert.style.display = 'none'; }, 5000);
+        }
+    });
+</script>
 </body>
 </html>

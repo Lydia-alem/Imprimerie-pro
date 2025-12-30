@@ -23,6 +23,182 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
+// Simple AJAX endpoints to return invoice HTML (modal) and printable page
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_invoice'])) {
+    $invoiceId = (int)$_GET['get_invoice'];
+    $stmt = $pdo->prepare("SELECT i.*, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.id = ?");
+    $stmt->execute([$invoiceId]);
+    $inv = $stmt->fetch();
+    if (!$inv) {
+        echo '<div style="padding:15px;"><div class="alert alert-warning">Facture introuvable.</div></div>';
+        exit();
+    }
+    // items
+    $itStmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
+    $itStmt->execute([$invoiceId]);
+    $items = $itStmt->fetchAll();
+    // payments
+    $pStmt = $pdo->prepare("SELECT * FROM payments WHERE invoice_id = ? ORDER BY payment_date DESC");
+    $pStmt->execute([$invoiceId]);
+    $payments = $pStmt->fetchAll();
+
+    ob_start();
+    ?>
+    <div style="padding:15px; max-width:800px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3>Facture #INV-<?php echo htmlspecialchars($inv['id']); ?></h3>
+                <div><?php echo htmlspecialchars($inv['created_at']); ?></div>
+            </div>
+            <div style="text-align:right;">
+                <strong>Client:</strong><br>
+                <?php echo htmlspecialchars($inv['client_name'] ?? ''); ?><br>
+                <?php if (!empty($inv['client_email'])): ?><?php echo htmlspecialchars($inv['client_email']); ?><br><?php endif; ?>
+                <?php if (!empty($inv['client_phone'])): ?><?php echo htmlspecialchars($inv['client_phone']); ?><br><?php endif; ?>
+            </div>
+        </div>
+
+        <hr>
+
+        <table style="width:100%; border-collapse:collapse; margin-top:10px;">
+            <thead>
+                <tr style="background:#f8f9fa;">
+                    <th style="padding:8px; text-align:left;">Description</th>
+                    <th style="padding:8px; text-align:right;">Quantité</th>
+                    <th style="padding:8px; text-align:right;">Prix</th>
+                    <th style="padding:8px; text-align:right;">Sous-total</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php if ($items): ?>
+                <?php foreach ($items as $it): ?>
+                <tr>
+                    <td style="padding:8px;"><?php echo nl2br(htmlspecialchars($it['description'])); ?></td>
+                    <td style="padding:8px; text-align:right;"><?php echo (int)$it['quantity']; ?></td>
+                    <td style="padding:8px; text-align:right;"><?php echo number_format($it['price'],2,',',' '); ?> DA</td>
+                    <td style="padding:8px; text-align:right;"><?php echo number_format($it['subtotal'],2,',',' '); ?> DA</td>
+                </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr><td colspan="4" style="padding:8px;">Aucun article</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+
+        <div style="margin-top:15px; text-align:right;">
+            <div><strong>Total:</strong> <?php echo number_format($inv['total'],2,',',' '); ?> DA</div>
+            <div><strong>Statut:</strong> <?php echo htmlspecialchars($inv['status']); ?></div>
+        </div>
+
+        <hr>
+
+        <h4>Versements</h4>
+        <?php if ($payments): ?>
+            <ul>
+                <?php foreach ($payments as $pay): ?>
+                <li><?php echo number_format($pay['amount'],2,',',' '); ?> DA — <?php echo htmlspecialchars($pay['payment_date']); ?> <?php if (!empty($pay['reference'])): ?> — Réf: <?php echo htmlspecialchars($pay['reference']); ?><?php endif; ?></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p>Aucun versement enregistré.</p>
+        <?php endif; ?>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:15px;">
+            <button class="btn btn-secondary" onclick="closeInvoiceModal()">Fermer</button>
+            <button class="btn btn-primary" onclick="window.open('ventes.php?print_invoice=<?php echo $invoiceId; ?>','_blank')">Imprimer</button>
+        </div>
+    </div>
+    <?php
+    echo ob_get_clean();
+    exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['print_invoice'])) {
+    $invoiceId = (int)$_GET['print_invoice'];
+    $stmt = $pdo->prepare("SELECT i.*, c.name as client_name, c.email as client_email, c.phone as client_phone, c.address as client_address FROM invoices i LEFT JOIN clients c ON i.client_id = c.id WHERE i.id = ?");
+    $stmt->execute([$invoiceId]);
+    $inv = $stmt->fetch();
+    if (!$inv) {
+        echo 'Facture introuvable';
+        exit();
+    }
+    $itStmt = $pdo->prepare("SELECT * FROM invoice_items WHERE invoice_id = ?");
+    $itStmt->execute([$invoiceId]);
+    $items = $itStmt->fetchAll();
+    $pStmt = $pdo->prepare("SELECT * FROM payments WHERE invoice_id = ? ORDER BY payment_date DESC");
+    $pStmt->execute([$invoiceId]);
+    $payments = $pStmt->fetchAll();
+
+    // Printable full HTML page
+    ?>
+    <!doctype html>
+    <html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <title>Facture #INV-<?php echo htmlspecialchars($inv['id']); ?></title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+            .invoice { max-width: 800px; margin: 0 auto; }
+            .header { display:flex; justify-content:space-between; align-items:center; }
+            table { width:100%; border-collapse:collapse; margin-top:20px; }
+            th, td { padding:10px; border:1px solid #ddd; text-align:left; }
+            th { background:#f8f9fa; }
+            .right { text-align:right; }
+        </style>
+    </head>
+    <body onload="window.print()">
+        <div class="invoice">
+            <div class="header">
+                <div>
+                    <h2>Facture #INV-<?php echo htmlspecialchars($inv['id']); ?></h2>
+                    <div>Créée: <?php echo htmlspecialchars($inv['created_at']); ?></div>
+                </div>
+                <div>
+                    <strong>Client</strong><br>
+                    <?php echo htmlspecialchars($inv['client_name'] ?? ''); ?><br>
+                    <?php if (!empty($inv['client_email'])): ?><?php echo htmlspecialchars($inv['client_email']); ?><br><?php endif; ?>
+                    <?php if (!empty($inv['client_phone'])): ?><?php echo htmlspecialchars($inv['client_phone']); ?><br><?php endif; ?>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr><th>Description</th><th class="right">Qte</th><th class="right">Prix</th><th class="right">Sous-total</th></tr>
+                </thead>
+                <tbody>
+                <?php if ($items): foreach ($items as $it): ?>
+                    <tr>
+                        <td><?php echo nl2br(htmlspecialchars($it['description'])); ?></td>
+                        <td class="right"><?php echo (int)$it['quantity']; ?></td>
+                        <td class="right"><?php echo number_format($it['price'],2,',',' '); ?> DA</td>
+                        <td class="right"><?php echo number_format($it['subtotal'],2,',',' '); ?> DA</td>
+                    </tr>
+                <?php endforeach; else: ?>
+                    <tr><td colspan="4">Aucun article</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+
+            <div style="margin-top:10px; text-align:right;">
+                <div><strong>Total:</strong> <?php echo number_format($inv['total'],2,',',' '); ?> DA</div>
+                <div><strong>Statut:</strong> <?php echo htmlspecialchars($inv['status']); ?></div>
+            </div>
+
+            <?php if ($payments): ?>
+            <h4>Versements</h4>
+            <ul>
+                <?php foreach ($payments as $pay): ?>
+                    <li><?php echo number_format($pay['amount'],2,',',' '); ?> DA — <?php echo htmlspecialchars($pay['payment_date']); ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit();
+}
+
 // For demo purposes - authentication
 $isLoggedIn = true;
 
@@ -601,6 +777,10 @@ if ($isLoggedIn) {
             font-size: 0.8rem;
         }
 
+        /* Modal */
+        .modal { display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:2000; }
+        .modal .modal-content { background:white; border-radius:8px; max-width:900px; width:95%; max-height:90vh; overflow:auto; padding:10px; }
+
         /* Responsive */
         @media (max-width: 1200px) {
             .sidebar {
@@ -806,7 +986,7 @@ if ($isLoggedIn) {
                 </div>
             </div>
 
-            <!-- Quick Actions - Cards like in the photo -->
+            <!-- Quick Actions - removed Bon de Réception and Vente au comptoir as requested -->
             <div class="quick-actions">
                 <div class="action-card" onclick="location.href='facture.php?type=new'">
                     <i class="fas fa-file-invoice-dollar"></i>
@@ -830,18 +1010,6 @@ if ($isLoggedIn) {
                     <i class="fas fa-truck"></i>
                     <h4>Bon de Livraison</h4>
                     <div class="price">Créer un BL</div>
-                </div>
-                
-                <div class="action-card" onclick="location.href='bon_reception.php'">
-                    <i class="fas fa-clipboard-check"></i>
-                    <h4>Bon de Réception</h4>
-                    <div class="price">Enregistrer réception</div>
-                </div>
-                
-                <div class="action-card" onclick="location.href='vente_comptoir.php'">
-                    <i class="fas fa-cash-register"></i>
-                    <h4>Vente au comptoir</h4>
-                    <div class="price">Vente directe</div>
                 </div>
             </div>
 
@@ -924,14 +1092,14 @@ if ($isLoggedIn) {
                                 </span>
                             </td>
                             <td>
-                                <button class="btn btn-primary btn-small" onclick="viewInvoice(<?php echo $invoice['id']; ?>)">
-                                    <i class="fas fa-eye"></i>
+                                <button class="btn btn-primary btn-small" onclick="showInvoice(<?php echo $invoice['id']; ?>)">
+                                    <i class="fas fa-eye"></i> Voir
                                 </button>
                                 <button class="btn btn-success btn-small" onclick="addPayment(<?php echo $invoice['id']; ?>)">
                                     <i class="fas fa-money-bill"></i>
                                 </button>
-                                <button class="btn btn-small" onclick="printInvoice(<?php echo $invoice['id']; ?>)">
-                                    <i class="fas fa-print"></i>
+                                <button class="btn btn-small" onclick="window.open('ventes.php?print_invoice=<?php echo $invoice['id']; ?>','_blank')">
+                                    <i class="fas fa-print"></i> Imprimer
                                 </button>
                             </td>
                         </tr>
@@ -946,6 +1114,17 @@ if ($isLoggedIn) {
                 <button class="btn btn-primary" onclick="location.href='login.php'">Se connecter</button>
             </div>
             <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Invoice Modal -->
+    <div id="invoiceModal" class="modal" aria-hidden="true">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid #eee;">
+                <h3 style="margin:0;">Facture</h3>
+                <button onclick="closeInvoiceModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+            </div>
+            <div id="invoiceModalBody" style="padding:12px;"></div>
         </div>
     </div>
 
@@ -994,24 +1173,36 @@ if ($isLoggedIn) {
             window.location.href = window.location.pathname;
         }
 
-        // View invoice
-        function viewInvoice(invoiceId) {
-            window.open('view_invoice.php?id=' + invoiceId, '_blank');
+        // Show invoice in modal (AJAX)
+        function showInvoice(invoiceId) {
+            const modal = document.getElementById('invoiceModal');
+            const body = document.getElementById('invoiceModalBody');
+            body.innerHTML = '<div style="padding:20px; text-align:center;">Chargement...</div>';
+            modal.style.display = 'flex';
+            fetch('ventes.php?get_invoice=' + encodeURIComponent(invoiceId))
+                .then(res => res.text())
+                .then(html => {
+                    body.innerHTML = html;
+                })
+                .catch(err => {
+                    body.innerHTML = '<div class="alert alert-danger">Erreur lors du chargement de la facture.</div>';
+                });
+        }
+
+        function closeInvoiceModal() {
+            document.getElementById('invoiceModal').style.display = 'none';
+            document.getElementById('invoiceModalBody').innerHTML = '';
         }
 
         // Add payment
         function addPayment(invoiceId) {
-            const amount = prompt('Montant du paiement:');
+            const amount = prompt('Montant du paiement (DA):');
             if (amount && !isNaN(amount) && amount > 0) {
-                // In a real application, you would make an AJAX call here
-                alert('Paiement de ' + amount + ' DA enregistré pour la facture #' + invoiceId);
+                // In a real application, you would POST to an endpoint to create the payment.
+                // For now we just show a message and reload.
+                alert('Paiement de ' + parseFloat(amount).toFixed(2) + ' DA enregistré pour la facture #' + invoiceId + ' (simulation).');
                 window.location.reload();
             }
-        }
-
-        // Print invoice
-        function printInvoice(invoiceId) {
-            window.open('print_invoice.php?id=' + invoiceId, '_blank');
         }
 
         // Export invoices
@@ -1033,6 +1224,11 @@ if ($isLoggedIn) {
             if (!document.getElementById('end_date').value) {
                 document.getElementById('end_date').value = today;
             }
+
+            // Close modal on outside click
+            document.getElementById('invoiceModal').addEventListener('click', function(e){
+                if (e.target === this) closeInvoiceModal();
+            });
         });
     </script>
 </body>

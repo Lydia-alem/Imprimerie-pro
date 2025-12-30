@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_product'])) {
         // Recalculer le total de la commande
         $total_stmt = $pdo->prepare("
             UPDATE orders SET total = (
-                SELECT SUM(subtotal) FROM order_items WHERE order_id = ?
+                SELECT COALESCE(SUM(subtotal),0) FROM order_items WHERE order_id = ?
             ) WHERE id = ?
         ");
         $total_stmt->execute([$order_id, $order_id]);
@@ -137,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_custom_item'])) {
     // Recalculer le total
     $total_stmt = $pdo->prepare("
         UPDATE orders SET total = (
-            SELECT SUM(subtotal) FROM order_items WHERE order_id = ?
+            SELECT COALESCE(SUM(subtotal),0) FROM order_items WHERE order_id = ?
         ) WHERE id = ?
     ");
     $total_stmt->execute([$order_id, $order_id]);
@@ -257,8 +257,122 @@ function getDaysRemaining($deadline) {
     $daysRemaining = floor($diffTime / (60 * 60 * 24));
     return $daysRemaining;
 }
-?>
 
+/**
+ * Ajax endpoint for order details
+ * If a GET request contains get_order_details, return an HTML fragment with the order details.
+ * This keeps the code self-contained and avoids relying on a separate get_order_details.php file.
+ */
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['get_order_details'])) {
+    $order_id = (int) $_GET['get_order_details'];
+    // Fetch order
+    $stmt = $pdo->prepare("
+        SELECT o.*, c.name as client_name, c.email as client_email, c.phone as client_phone
+        FROM orders o
+        LEFT JOIN clients c ON o.client_id = c.id
+        WHERE o.id = ?
+    ");
+    $stmt->execute([$order_id]);
+    $order = $stmt->fetch();
+
+    if (!$order) {
+        echo '<div class="alert alert-warning"><i class="fas fa-exclamation-circle"></i> Commande introuvable.</div>';
+        exit();
+    }
+
+    // Get items
+    $items = getOrderItems($pdo, $order_id);
+
+    // Get invoice and payments if any
+    $invoice = null;
+    $payments = [];
+    $inv_stmt = $pdo->prepare("SELECT * FROM invoices WHERE order_id = ?");
+    $inv_stmt->execute([$order_id]);
+    $invoice = $inv_stmt->fetch();
+    if ($invoice) {
+        $pay_stmt = $pdo->prepare("SELECT * FROM payments WHERE invoice_id = ? ORDER BY payment_date DESC");
+        $pay_stmt->execute([$invoice['id']]);
+        $payments = $pay_stmt->fetchAll();
+    }
+
+    // Build HTML
+    ob_start();
+    ?>
+    <div style="padding:10px;">
+        <h4>Commande CMD-<?php echo str_pad($order['id'], 5, '0', STR_PAD_LEFT); ?></h4>
+        <p><strong>Client:</strong> <?php echo htmlspecialchars($order['client_name']); ?></p>
+        <p><strong>Téléphone:</strong> <?php echo htmlspecialchars($order['client_phone'] ?: 'Non renseigné'); ?></p>
+        <p><strong>Email:</strong> <?php echo htmlspecialchars($order['client_email'] ?: 'Non renseigné'); ?></p>
+        <p><strong>Statut:</strong> <?php echo htmlspecialchars(getStatusText($order['status'])); ?></p>
+        <p><strong>Créé le:</strong> <?php echo date('d/m/Y H:i', strtotime($order['created_at'])); ?></p>
+        <p><strong>Échéance:</strong> <?php echo htmlspecialchars(formatDate($order['deadline'])); ?></p>
+
+        <hr>
+
+        <h4>Détails des articles</h4>
+        <?php if (!empty($items)): ?>
+            <table style="width:100%; border-collapse: collapse; margin-top:10px;">
+                <thead>
+                    <tr style="background:#f8f9fa;">
+                        <th style="padding:8px; text-align:left;">Produit / Description</th>
+                        <th style="padding:8px; text-align:left;">Quantité</th>
+                        <th style="padding:8px; text-align:left;">Prix unitaire</th>
+                        <th style="padding:8px; text-align:left;">Sous-total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($items as $it): ?>
+                    <tr>
+                        <td style="padding:8px; vertical-align:top;">
+                            <strong><?php echo htmlspecialchars($it['product_name'] ?: 'Article personnalisé'); ?></strong>
+                            <?php if ($it['description'] && !$it['product_name']): ?>
+                            <div style="font-size:0.9rem; color:#666; margin-top:6px;"><?php echo nl2br(htmlspecialchars($it['description'])); ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="padding:8px; vertical-align:top;"><?php echo (int)$it['quantity']; ?></td>
+                        <td style="padding:8px; vertical-align:top;"><?php echo number_format($it['price'], 2, ',', ' '); ?> DA</td>
+                        <td style="padding:8px; vertical-align:top;"><?php echo number_format($it['subtotal'], 2, ',', ' '); ?> DA</td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else: ?>
+            <p>Aucun article pour cette commande.</p>
+        <?php endif; ?>
+
+        <hr>
+
+        <p><strong>Total commande:</strong> <span style="font-weight:700;"><?php echo number_format($order['total'], 2, ',', ' '); ?> DA</span></p>
+
+        <?php if ($invoice): ?>
+            <h4>Facture</h4>
+            <p><strong>Facture ID:</strong> <?php echo $invoice['id']; ?> — <strong>Montant:</strong> <?php echo number_format($invoice['total'], 2, ',', ' '); ?> DA — <strong>Statut:</strong> <?php echo htmlspecialchars($invoice['status']); ?></p>
+
+            <h5>Versements</h5>
+            <?php if (!empty($payments)): ?>
+                <ul style="padding-left:18px;">
+                    <?php foreach ($payments as $pay): ?>
+                        <li>
+                            <?php echo number_format($pay['amount'], 2, ',', ' '); ?> DA — <?php echo formatDate($pay['payment_date']); ?>
+                            <?php if (!empty($pay['reference'])): ?> — Réf: <?php echo htmlspecialchars($pay['reference']); ?> <?php endif; ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <p>Aucun versement enregistré.</p>
+            <?php endif; ?>
+        <?php else: ?>
+            <p>Aucune facture liée à cette commande.</p>
+        <?php endif; ?>
+
+    </div>
+    <?php
+    $html = ob_get_clean();
+    echo $html;
+    exit();
+}
+
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1230,15 +1344,15 @@ function getDaysRemaining($deadline) {
     <script>
         // Afficher les détails d'une commande
         function showOrderDetails(orderId) {
-            // Créer une requête AJAX pour obtenir les détails
+            // Use the same PHP file as endpoint
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', 'get_order_details.php?order_id=' + orderId, true);
+            xhr.open('GET', 'commande.php?get_order_details=' + orderId, true);
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     document.getElementById('orderDetailsContent').innerHTML = xhr.responseText;
                     document.getElementById('orderDetailsModal').style.display = 'flex';
                 } else {
-                    document.getElementById('orderDetailsContent').innerHTML = 
+                    document.getElementById('orderDetailsContent').innerHTML =
                         '<div class="alert alert-danger">Erreur lors du chargement des détails.</div>';
                     document.getElementById('orderDetailsModal').style.display = 'flex';
                 }
