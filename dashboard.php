@@ -936,13 +936,23 @@ if ($isLoggedIn) {
                     </a>
                      
                     <a href="probleme.php" class="nav-card nav-card-probleme">
+                       <div class="nav-card-icon">
+                         <i class="fas fa-exclamation-triangle"></i>
+                      </div>
+                      <h3>Problèmes</h3>
+                       <p>Détectez et gérez tous les problèmes urgents</p>
+                       <small style="color: var(--warning); font-weight: 500;">
+                           <i class="fas fa-exclamation-circle"></i> <?php echo $stats['urgent_issues'] ?? 0; ?> problèmes détectés
+                       </small>
+                    </a>
+                     <a href="dettes.php" class="nav-card nav-card-probleme">
     <div class="nav-card-icon">
-        <i class="fas fa-exclamation-triangle"></i>
+        <i class="fas fa-money-check-alt"></i>
     </div>
-    <h3>Problèmes</h3>
-    <p>Détectez et gérez tous les problèmes urgents</p>
+    <h3>Dettes</h3>
+    <p>Gérez les dettes clients et suivez les paiements</p>
     <small style="color: var(--warning); font-weight: 500;">
-        <i class="fas fa-exclamation-circle"></i> <?php echo $stats['urgent_issues'] ?? 0; ?> problèmes détectés
+        
     </small>
 </a>
                 </div>
