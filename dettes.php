@@ -952,12 +952,7 @@ if ($isLoggedIn) {
                         <span>Employés</span>
                     </a>
                 </li>
-                <li class="active">
-                    <a href="dettes.php">
-                        <i class="fas fa-money-check-alt"></i>
-                        <span>Dettes Clients</span>
-                    </a>
-                </li>
+                
                 <li>
                     <a href="gestion.php">
                         <i class="fas fa-cogs"></i>
