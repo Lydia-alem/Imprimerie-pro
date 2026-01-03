@@ -383,30 +383,30 @@ $total_ttc = $total_ht + $total_tva;
             <div class="company-info">
                 <?php if (!empty($settings['company_logo'])): ?>
                 <div class="logo-container">
-                    <img src="<?php echo htmlspecialchars($settings['company_logo']); ?>" alt="Logo" class="logo">
+                    <img src="REM.jpg" alt="Logo" class="logo">
                 </div>
                 <?php endif; ?>
                 
                 <div class="company-name">
-                    <?php echo !empty($settings['company_name']) ? htmlspecialchars($settings['company_name']) : 'Imprimerie Pro'; ?>
+                    <img src="REM.jpg" alt="Logo" class="logo">
                 </div>
                 <div class="company-details">
                     <?php if (!empty($settings['company_address'])): ?>
                     <div><?php echo htmlspecialchars($settings['company_address']); ?></div>
                     <?php else: ?>
-                    <div>123 Rue de l'Impression, 1000 Tunis</div>
+                    <div>Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</div>
                     <?php endif; ?>
                     
                     <?php if (!empty($settings['company_phone'])): ?>
                     <div>Téléphone : <?php echo htmlspecialchars($settings['company_phone']); ?></div>
                     <?php else: ?>
-                    <div>Téléphone : +216 71 123 456</div>
+                    <div>Téléphone : 0660639631/0560988875</div>
                     <?php endif; ?>
                     
                     <?php if (!empty($settings['company_email'])): ?>
                     <div>Email : <?php echo htmlspecialchars($settings['company_email']); ?></div>
                     <?php else: ?>
-                    <div>Email : contact@imprimeriepro.tn</div>
+                    <div>Email : Rymemballagemoderne@gmail.com</div>
                     <?php endif; ?>
                     
                     <?php if (!empty($settings['company_tax_id'])): ?>
