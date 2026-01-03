@@ -1965,9 +1965,9 @@
                         <div class="invoice-preview">
                             <div class="invoice-header-preview">
                                 <img src=REM.jpg alt="logo" height="50" width="100">
-                                <p> Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
-                                <p>Tél: 0660639631 / 0560988875 | Email:Rymemballagemoderne@gmail.com</p>
-                                <p>NIF: <span id="previewCompanyNif">298619280219028</span> | RC: <span id="previewCompanyRc">15A0512508</span> | N° Article: <span id="previewCompanyArticleNumber">19018372051</span></p>
+                                <p> Facture</p>
+                                <p></p>
+                                <p> <span id="previewCompanyNif"></span>  <span id="previewCompanyRc"></span>  <span id="previewCompanyArticleNumber"></span></p>
                             </div>
 
                             <div class="invoice-info-grid">
@@ -2228,9 +2228,7 @@
                             <div class="bl-header-preview">
                                 <img src=REM.jpg alt="logo" height="50" width="100">
                                 <h3>BON DE LIVRAISON</h3>
-                                <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
-                                <p>Tél: 0660639631 / 0560988875  | Email: Rymemballagemoderne@gmail.com</p>
-                                <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
+                                
                             </div>
 
                             <div class="bl-info-grid">
@@ -2540,17 +2538,17 @@
             <div id="printInvoiceContent">
                 <div class="print-header">
                     <div class="logo">
-                        <img src="REM.png" alt="Logo Imprimerie" 
+                        <img src="REM.jpg" alt="Logo Imprimerie" 
                              onerror="this.src='https://via.placeholder.com/100/3498db/ffffff?text=IP'">
                     </div>
 
-                    <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
-                    <p>Tél: 0660639631/0560988875 | Email: Rymemballagemoderne@gmail.com</p>
+                    
                     <p>NIF: <span id="printCompanyNif">298619280219028</span> | RC: <span id="printCompanyRc">15A0512508-19/00</span> | N° Article: <span id="printCompanyArticleNumber">19018372051</span></p>
                 </div>
 
                 <div class="print-invoice-info">
-                    <h3>FACTURE</h3>
+                    
+                    <h3>FACTURE <?php echo str_pad($invoice['id'], 4, '0', STR_PAD_LEFT); ?></h3>
                     <div class="print-invoice-meta">
                         <div><strong>N°:</strong> <span id="printInvoiceNumber"><?php echo $nextInvoiceNumber; ?></span></div>
                         <div><strong>Date:</strong> <span id="printInvoiceDate"><?php echo date('d/m/Y'); ?></span></div>
@@ -2669,16 +2667,14 @@
                         <img src="REM.jpg" alt="Logo Imprimerie" 
                              onerror="this.src='https://via.placeholder.com/100/2ecc71/ffffff?text=BL'">
                     </div>
-                    <p>Rue Bellil Abd Allah lotissement 118 N° 119,Setif 19000</p>
-                    <p>Tél: 0660639631 / 0560988875 | Email: contact@imprimerie-pro.dz</p>
-                    <p>NIF: 298619280219028 | RC: 15A0512508 | N° Article: 19018372051</p>
+                    
                 </div>
 
                 <div class="print-bl-info">
                     
-                    <h3>BON DE LIVRAISON</h3>
+                    <h3>BON DE LIVRAISON <span id="printBLNumber"><?php echo $nextBLNumber; ?></span></h3>
                     <div class="print-bl-meta">
-                        <div><strong>N° BL:</strong> <span id="printBLNumber"><?php echo $nextBLNumber; ?></span></div>
+                        
                         <div><strong>Date:</strong> <span id="printBLDate"><?php echo date('d/m/Y'); ?></span></div>
                         <div><strong>Référence:</strong> <span id="printReference">-</span></div>
                     </div>
@@ -3846,7 +3842,7 @@
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Imprimer Facture</title>
+                        <title></title>
                         <style>
                             body { font-family: Arial, sans-serif; margin: 20px; }
                             .invoice-header { text-align: center; margin-bottom: 30px; }
@@ -3907,7 +3903,7 @@
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Imprimer BL</title>
+                        <title></title>
                         <style>
                             body { font-family: Arial, sans-serif; margin: 20px; }
                             .bl-header { text-align: center; margin-bottom: 30px; }
@@ -4003,33 +3999,37 @@
                     <div class="invoice-header">
                         
                         <img src="REM.jpg" alt="Logo" style="max-width: 150px; margin-bottom: 10px;">
-                        <h1>FACTURE</h1>
-                        <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
-                        <p>Tél: 0660639631/0560988875| Email: Rymemballagemoderne@gmail.com</p>
+                        <h1>FACTURE ${document.getElementById('invoice_number').value}</h1>
                         <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
+                        
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <div>
-                            <p><strong>N° Facture:</strong> ${document.getElementById('invoice_number').value}</p>
+                            
                             <p><strong>Date:</strong> ${formatDate(document.getElementById('invoice_date').value)}</p>
+                            
+                        </div>
+                        <div>
                             <p><strong>Échéance:</strong> ${formatDate(document.getElementById('due_date').value)}</p>
+                            
                         </div>
                         <div>
                             <p><strong>Conditions paiement:</strong> ${document.getElementById('payment_terms').value}</p>
-                            <p><strong>Conditions livraison:</strong> ${document.getElementById('delivery_terms').value}</p>
+                            
                         </div>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                        <div class="company-info" style="flex: 1; margin-right: 10px;">
+                        <div class="company-info" style="flex: 1; margin-right: 10px; padding:7px ;height:225px">
                             <h3>Émise par:</h3>
                             <p><strong>RYM EMBALLAGE MODERNE</strong></p>
                             <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
                             <p>Tél: 0660639631/0560988875</p>
                             <p>Email: Rymemballagemoderne@gmail.com</p>
+                            
                         </div>
-                        <div class="client-info" style="flex: 1; margin-left: 10px;">
+                        <div class="client-info" style="flex: 1; margin-left: 10px;padding:7px ;height:225px">
                             <h3>Facturé à:</h3>
                             <p><strong>${clientName}</strong></p>
                             <p>${address}</p>
@@ -4057,7 +4057,7 @@
                         </tbody>
                     </table>
                     
-                    <div style="float: right; width: 300px;">
+                    <div style="float: right; width: 300px;height:30px">
                         <div class="total-row">
                             <span>Sous-total HT:</span>
                             <span>${formatCurrency(result.subtotal)}</span>
@@ -4072,16 +4072,15 @@
                         </div>
                     </div>
                     
-                    <div style="clear: both; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
-                        <p><strong>Montant en lettres:</strong> ${amountInLetters}</p>
-                    </div>
                     
-                    <div style="margin-top: 30px;">
+                    
+                    <div style="margin-top: 30px;padding:5px">
                         <p><strong>Notes:</strong> ${document.getElementById('notes').value || '-'}</p>
                         <p style="font-style: italic;">
-                            Paiement par virement bancaire à l'IBAN: DZ 1234 5678 9012 3456 7890 1234
+                            
                         </p>
                     </div>
+                    
                     
                     <div class="signatures">
                         <div class="signature-box">
@@ -4124,15 +4123,14 @@
                 return `
                     <div class="bl-header">
                         <img src="REM.jpg" alt="Logo" style="max-width: 150px; margin-bottom: 10px;">
-                        <h1>FACTURE</h1>
-                        <p>123 Rue Bellil Abd Allah lotissement 118 N°119, Setif 19000, Algérie</p>
-                        <p>Tél: 0660639631/0560988875| Email: Rymemballagemoderne@gmail.com</p>
+                        <h1>BON DE LIVRAISON ${document.getElementById('bl_number').value} </h1>
+                        
                         <p>NIF: 298619280219028 | RC: 15A0512508-19/00 | N° Article: 19018372051</p>
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
                         <div>
-                            <p><strong>N° BL:</strong> ${document.getElementById('bl_number').value}</p>
+                            
                             <p><strong>Date:</strong> ${formatDate(document.getElementById('bl_date').value)}</p>
                             <p><strong>Référence:</strong> ${document.getElementById('reference').value || '-'}</p>
                         </div>
