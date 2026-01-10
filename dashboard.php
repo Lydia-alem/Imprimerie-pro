@@ -774,6 +774,12 @@ if ($isLoggedIn) {
                         <span>Facturation</span>
                     </a>
                 </li>
+                <li >
+                    <a href="bondecommande.php">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Bon de Commande</span>
+                    </a>
+                </li>
                 <li>
                     <a href="employees.php">
                         <i class="fas fa-user-tie"></i>
