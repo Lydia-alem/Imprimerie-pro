@@ -1206,6 +1206,12 @@ if (isset($_GET['update_status']) && isset($_GET['quote_id']) && isset($_GET['st
                 <span>Ventes</span>
             </a>
         </li>
+        <li>
+                    <a href="admin_dettes.php">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <span>Mes Dettes</span>
+                    </a>
+                </li>
             <a href="profile.php">
                 <i class="fas fa-user"></i>
                 <span>Mon Profil</span>
