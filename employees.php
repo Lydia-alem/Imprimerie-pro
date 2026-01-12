@@ -1090,6 +1090,12 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                 <span>Ventes</span>
             </a>
         </li>
+        <li>
+                    <a href="admin_dettes.php">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <span>Mes Dettes</span>
+                    </a>
+                </li>
                 <li>
                     <a href="profile.php">
                         <i class="fas fa-user"></i>
