@@ -1362,6 +1362,13 @@ if (isset($_GET['bc_id'])) {
             </a>
         </li>
         <li>
+                    <a href="admin_dettes.php">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <span>Mes Dettes</span>
+                    </a>
+                </li>
+        <li>
+        <li>
             <a href="profile.php">
                 <i class="fas fa-user"></i>
                 <span>Mon Profil</span>
