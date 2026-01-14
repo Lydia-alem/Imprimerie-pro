@@ -1641,6 +1641,13 @@ $edit_category = $edit_category_id ? getCategoryById($pdo, $edit_category_id) : 
             </a>
         </li>
         <li>
+                    <a href="admin_dettes.php">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <span>Mes Dettes</span>
+                    </a>
+                </li>
+        <li>
+        <li>
             <a href="profile.php">
                 <i class="fas fa-user"></i>
                 <span>Mon Profil</span>
