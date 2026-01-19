@@ -639,7 +639,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <i class="fas fa-sales"></i>
                 <span>Ventes</span>
             </a>
-        </li>
+        </li><li>
+                    <a href="admin_dettes.php">
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <span>Mes Dettes</span>
+                    </a>
+                </li>
                 <li class="active">
                     <a href="profile.php">
                         <i class="fas fa-user"></i>
