@@ -1674,7 +1674,7 @@ $edit_category = $edit_category_id ? getCategoryById($pdo, $edit_category_id) : 
                     <input type="hidden" name="tab" value="<?php echo $tab; ?>">
                 </form>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="" alt="Admin">
                     <span><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'Admin'); ?></span>
                 </div>
             </div>
