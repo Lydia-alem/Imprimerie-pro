@@ -1121,7 +1121,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
                     <input type="text" id="searchInput" placeholder="Rechercher un employé...">
                 </div>
                 <div class="user-profile">
-                    <img src="https://i.pravatar.cc/150?img=12" alt="Admin">
+                    <img src="" alt="Admin">
                     <span>Admin</span>
                 </div>
             </div>
