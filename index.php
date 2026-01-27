@@ -574,7 +574,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <input type="checkbox" id="remember" name="remember" <?php echo isset($_COOKIE['user_email']) ? 'checked' : ''; ?>>
                         <label for="remember">Se souvenir de moi</label>
                     </div>
-                    <a href="#" class="forgot-password">Mot de passe oublié?</a>
+                    
                 </div>
                 <button type="submit" class="btn btn-login">Se connecter</button>
             </form>
