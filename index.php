@@ -580,7 +580,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </form>
             
             <div class="register-link">
-                <p>Nouvel administrateur? <a href="register.php">Créer un compte</a></p>
+                <p> <a href="register.php"></a></p>
             </div>
         </div>
     </div>
