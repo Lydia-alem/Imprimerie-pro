@@ -6,10 +6,10 @@
 session_start();
 
 // DB config — keep same as other files
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root';
-$password = 'admine';
+define('DB_HOST', '');
+define('DB_NAME', '');
+define('DB_USER', '');
+define('DB_PASS', '');
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password, [
