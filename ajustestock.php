@@ -10,10 +10,10 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Configuration de la base de données
-define('DB_HOST', '127.0.0.1:3306');
-define('DB_NAME', 'imprimerie');
-define('DB_USER', 'root'); 
-define('DB_PASS', 'admine'); 
+define('DB_HOST', '');
+define('DB_NAME', '');
+define('DB_USER', '');
+define('DB_PASS', '');
 
 // Connexion à la base de données
 try {
