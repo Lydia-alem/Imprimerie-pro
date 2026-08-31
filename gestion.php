@@ -3,10 +3,10 @@
 session_start();
 
 // Database configuration - UPDATE THESE FOR YOUR ENVIRONMENT
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root'; // Change this
-$password = 'admine'; // Change this
+$host = '';
+$dbname = '';
+$username = '';
+$password = '';
 
 // Create connection
 try {
