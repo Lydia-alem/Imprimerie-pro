@@ -3,11 +3,10 @@
 session_start();
 
 // Connexion à la base de données
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root';
-$password = 'admine';
-
+$host = '';
+$dbname = '';
+$username = '';
+$password = '';
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
