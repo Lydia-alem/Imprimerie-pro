@@ -2,10 +2,10 @@
 session_start();
 
 // Database configuration
-$host = '127.0.0.1:3306';
-$dbname = 'imprimerie';
-$username = 'root';
-$password = 'admine';
+$host = '';
+$dbname = '';
+$username = '';
+$password = '';
 
 // Initialize variables
 $email = $password_input = '';
