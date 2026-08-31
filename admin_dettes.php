@@ -1,9 +1,9 @@
 <?php
 // Configuration de la base de données
-define('DB_HOST', '127.0.0.1:3306');
-define('DB_NAME', 'imprimerie');
-define('DB_USER', 'root');
-define('DB_PASS', 'admine');
+define('DB_HOST', '');
+define('DB_NAME', '');
+define('DB_USER', '');
+define('DB_PASS', '');
 
 // Démarrer la session
 session_start();
